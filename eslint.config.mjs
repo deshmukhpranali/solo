@@ -70,6 +70,7 @@ export default [
       '@typescript-eslint/no-empty-function': 'off',
       '@typescript-eslint/class-literal-property-style': 'off',
       'no-invalid-this': [ 'error', { capIsConstructor : false } ],
+      'no-prototype-builtins': 'off'
     }
   },
   { // test ts files

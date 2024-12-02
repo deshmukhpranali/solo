@@ -22,7 +22,6 @@ import {
   accountCreationShouldSucceed,
   balanceQueryShouldSucceed,
   e2eTestSuite,
-  getDefaultArgv,
   HEDERA_PLATFORM_VERSION_TAG
 } from '../../test_util.js'
 import { getNodeLogs, getTmpDir } from '../../../src/core/helpers.js'
@@ -30,26 +29,27 @@ import { HEDERA_HAPI_PATH, MINUTES, ROOT_CONTAINER } from '../../../src/core/con
 import fs from 'fs'
 import type { PodName } from '../../../src/types/aliases.js'
 import * as NodeCommandConfigs from '../../../src/commands/node/configs.js'
+import { ArgvMoc } from '../../argv_moc.js'
 
 const namespace = 'node-delete'
 const nodeAlias = 'node1'
-const argv = getDefaultArgv()
-argv[flags.nodeAliasesUnparsed.name] = 'node1,node2'
-argv[flags.nodeAlias.name] = nodeAlias
-argv[flags.stakeAmounts.name] = '1,1000'
-argv[flags.generateGossipKeys.name] = true
-argv[flags.generateTlsKeys.name] = true
-argv[flags.persistentVolumeClaims.name] = true
-// set the env variable SOLO_CHARTS_DIR if developer wants to use local Solo charts
-argv[flags.chartDirectory.name] = process.env.SOLO_CHARTS_DIR ?? undefined
-argv[flags.releaseTag.name] = HEDERA_PLATFORM_VERSION_TAG
-argv[flags.namespace.name] = namespace
-argv[flags.quiet.name] = true
-e2eTestSuite(namespace, argv, undefined, undefined, undefined, undefined, undefined, undefined, true, (bootstrapResp) => {
+const argv = ArgvMoc.getDefaultArgv()
+  .setValue(flags.nodeAliasesUnparsed, 'node1,node2')
+  .setValue(flags.nodeAlias, nodeAlias)
+  .setValue(flags.stakeAmounts, '1,1000')
+  .setValue(flags.generateGossipKeys, true)
+  .setValue(flags.generateTlsKeys, true)
+  .setValue(flags.persistentVolumeClaims, true)
+  .setValue(flags.releaseTag, HEDERA_PLATFORM_VERSION_TAG)
+  .setValue(flags.namespace, namespace)
+  .setValue(flags.quiet, true)
+
+//set the env variable SOLO_CHARTS_DIR if a developer wants to use local Solo charts
+argv.setValueWithDefault(flags.chartDirectory, process.env.SOLO_CHARTS_DIR, undefined)
+
+e2eTestSuite(namespace, argv, {}, true, (bootstrapResp) => {
   describe('Node delete', async () => {
-    const nodeCmd = bootstrapResp.cmd.nodeCmd
-    const accountCmd = bootstrapResp.cmd.accountCmd
-    const k8 = bootstrapResp.opts.k8
+    const { opts: { k8, accountManager }, cmd: { nodeCmd, accountCmd } } = bootstrapResp
 
     after(async function () {
       this.timeout(10 * MINUTES)
@@ -58,24 +58,24 @@ e2eTestSuite(namespace, argv, undefined, undefined, undefined, undefined, undefi
     })
 
     it('should succeed with init command', async () => {
-      const status = await accountCmd.init(argv)
+      const status = await accountCmd.init(argv.build())
       expect(status).to.be.ok
     }).timeout(8 * MINUTES)
 
     it('should delete a node from the network successfully', async () => {
-      await nodeCmd.handlers.delete(argv)
+      await nodeCmd.handlers.delete(argv.build())
       expect(nodeCmd.getUnusedConfigs(NodeCommandConfigs.DELETE_CONFIGS_NAME)).to.deep.equal([
         flags.devMode.constName,
         flags.force.constName,
         flags.quiet.constName
       ])
 
-      await bootstrapResp.opts.accountManager.close()
+      await accountManager.close()
     }).timeout(10 * MINUTES)
 
-    balanceQueryShouldSucceed(bootstrapResp.opts.accountManager, nodeCmd, namespace)
+    balanceQueryShouldSucceed(accountManager, nodeCmd, namespace)
 
-    accountCreationShouldSucceed(bootstrapResp.opts.accountManager, nodeCmd, namespace)
+    accountCreationShouldSucceed(accountManager, nodeCmd, namespace)
 
     it('config.txt should no longer contain removed node alias name', async () => {
       // read config.txt file from first node, read config.txt line by line, it should not contain value of nodeAlias

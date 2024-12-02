@@ -33,7 +33,6 @@ import * as version from '../../../version.js'
 import {
   bootstrapTestVariables,
   e2eTestSuite,
-  getDefaultArgv,
   HEDERA_PLATFORM_VERSION_TAG,
   TEST_CLUSTER,
   testLogger
@@ -42,31 +41,31 @@ import { AccountCommand } from '../../../src/commands/account.js'
 import { flags } from '../../../src/commands/index.js'
 import { getNodeLogs } from '../../../src/core/helpers.js'
 import { MINUTES, SECONDS } from '../../../src/core/constants.js'
+import { ArgvMoc } from '../../argv_moc.js'
 
 const defaultTimeout = 20 * SECONDS
 
 const testName = 'account-cmd-e2e'
 const namespace = testName
 const testSystemAccounts = [[3, 5]]
-const argv = getDefaultArgv()
-argv[flags.namespace.name] = namespace
-argv[flags.releaseTag.name] = HEDERA_PLATFORM_VERSION_TAG
-argv[flags.nodeAliasesUnparsed.name] = 'node1'
-argv[flags.generateGossipKeys.name] = true
-argv[flags.generateTlsKeys.name] = true
-argv[flags.clusterName.name] = TEST_CLUSTER
-argv[flags.soloChartVersion.name] = version.SOLO_CHART_VERSION
-// set the env variable SOLO_CHARTS_DIR if developer wants to use local Solo charts
-argv[flags.chartDirectory.name] = process.env.SOLO_CHARTS_DIR ?? undefined
+const argv = ArgvMoc.getDefaultArgv()
+  .setValue(flags.namespace,  namespace)
+  .setValue(flags.releaseTag,  HEDERA_PLATFORM_VERSION_TAG)
+  .setValue(flags.nodeAliasesUnparsed,  'node1')
+  .setValue(flags.generateGossipKeys,  true)
+  .setValue(flags.generateTlsKeys,  true)
+  .setValue(flags.clusterName,  TEST_CLUSTER)
+  .setValue(flags.soloChartVersion,  version.SOLO_CHART_VERSION)
 
-e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefined, undefined, true, (bootstrapResp) => {
+// set the env variable SOLO_CHARTS_DIR if a developer wants to use local Solo charts
+argv.setValueWithDefault(flags.chartDirectory, process.env.SOLO_CHARTS_DIR, undefined)
+
+e2eTestSuite(testName, argv, {}, true, (bootstrapResp) => {
   describe('AccountCommand', async () => {
     const accountCmd = new AccountCommand(bootstrapResp.opts, testSystemAccounts)
     bootstrapResp.cmd.accountCmd = accountCmd
-    const k8 = bootstrapResp.opts.k8
-    const accountManager = bootstrapResp.opts.accountManager
-    const configManager = bootstrapResp.opts.configManager
-    const nodeCmd = bootstrapResp.cmd.nodeCmd
+
+    const { opts: { k8, accountManager, configManager }, cmd: { nodeCmd, networkCmd } }  = bootstrapResp
 
     after(async function () {
       this.timeout(3 * MINUTES)
@@ -78,7 +77,7 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
     })
 
     describe('node proxies should be UP', () => {
-      for (const nodeAlias of argv[flags.nodeAliasesUnparsed.name].split(',')) {
+      for (const nodeAlias of argv.getValue(flags.nodeAliasesUnparsed).split(',')) {
         it(`proxy should be UP: ${nodeAlias} `, async () => {
           await k8.waitForPodReady(
               [`app=haproxy-${nodeAlias}`, 'solo.hedera.com/type=haproxy'],
@@ -89,7 +88,7 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
 
     describe('account init command', () => {
       it('should succeed with init command', async () => {
-        const status = await accountCmd.init(argv)
+        const status = await accountCmd.init(argv.build())
         expect(status).to.be.ok
       }).timeout(3 * MINUTES)
 
@@ -131,8 +130,8 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
 
       it('should create account with no options', async () => {
         try {
-          argv[flags.amount.name] = 200
-          expect(await accountCmd.create(argv)).to.be.true
+          argv.setValue(flags.amount, 200)
+          expect(await accountCmd.create(argv.build())).to.be.true
 
           // @ts-ignore to access the private property
           const accountInfo = accountCmd.accountInfo
@@ -153,11 +152,11 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
 
       it('should create account with private key and hbar amount options', async () => {
         try {
-          argv[flags.ed25519PrivateKey.name] = constants.GENESIS_KEY
-          argv[flags.amount.name] = 777
-          configManager.update(argv)
+          argv.setValue(flags.ed25519PrivateKey, constants.GENESIS_KEY)
+          argv.setValue(flags.amount, 777)
+          configManager.update(argv.build())
 
-          expect(await accountCmd.create(argv)).to.be.true
+          expect(await accountCmd.create(argv.build())).to.be.true
 
           // @ts-ignore to access the private property
           const accountInfo = accountCmd.accountInfo
@@ -175,16 +174,16 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
 
       it('should update account-1', async () => {
         try {
-          argv[flags.amount.name] = 0
-          argv[flags.accountId.name] = accountId1
-          configManager.update(argv)
+          argv.setValue(flags.amount, 0)
+          argv.setValue(flags.accountId, accountId1)
+          configManager.update(argv.build())
 
-          expect(await accountCmd.update(argv)).to.be.true
+          expect(await accountCmd.update(argv.build())).to.be.true
 
           // @ts-ignore to access the private property
           const accountInfo = accountCmd.accountInfo
           expect(accountInfo).not.to.be.null
-          expect(accountInfo.accountId).to.equal(argv[flags.accountId.name])
+          expect(accountInfo.accountId).to.equal(argv.getValue(flags.accountId))
           expect(accountInfo.privateKey).to.be.undefined
           expect(accountInfo.publicKey).not.to.be.null
           expect(accountInfo.balance).to.equal(200)
@@ -196,17 +195,17 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
 
       it('should update account-2 with accountId, amount, new private key, and standard out options', async () => {
         try {
-          argv[flags.accountId.name] = accountId2
-          argv[flags.ed25519PrivateKey.name] = constants.GENESIS_KEY
-          argv[flags.amount.name] = 333
-          configManager.update(argv)
+          argv.setValue(flags.accountId, accountId2)
+          argv.setValue(flags.ed25519PrivateKey, constants.GENESIS_KEY)
+          argv.setValue(flags.amount, 333)
+          configManager.update(argv.build())
 
-          expect(await accountCmd.update(argv)).to.be.true
+          expect(await accountCmd.update(argv.build())).to.be.true
 
           // @ts-ignore to access the private property
           const accountInfo = accountCmd.accountInfo
           expect(accountInfo).not.to.be.null
-          expect(accountInfo.accountId).to.equal(argv[flags.accountId.name])
+          expect(accountInfo.accountId).to.equal(argv.getValue(flags.accountId))
           expect(accountInfo.privateKey).to.be.undefined
           expect(accountInfo.publicKey).not.to.be.null
           expect(accountInfo.balance).to.equal(1_110)
@@ -218,14 +217,14 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
 
       it('should be able to get account-1', async () => {
         try {
-          argv[flags.accountId.name] = accountId1
-          configManager.update(argv)
+          argv.setValue(flags.accountId, accountId1)
+          configManager.update(argv.build())
 
-          expect(await accountCmd.get(argv)).to.be.true
+          expect(await accountCmd.get(argv.build())).to.be.true
           // @ts-ignore to access the private property
           const accountInfo = accountCmd.accountInfo
           expect(accountInfo).not.to.be.null
-          expect(accountInfo.accountId).to.equal(argv[flags.accountId.name])
+          expect(accountInfo.accountId).to.equal(argv.getValue(flags.accountId))
           expect(accountInfo.privateKey).to.be.undefined
           expect(accountInfo.publicKey).to.be.ok
           expect(accountInfo.balance).to.equal(200)
@@ -237,14 +236,14 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
 
       it('should be able to get account-2', async () => {
         try {
-          argv[flags.accountId.name] = accountId2
-          configManager.update(argv)
+          argv.setValue(flags.accountId, accountId2)
+          configManager.update(argv.build())
 
-          expect(await accountCmd.get(argv)).to.be.true
+          expect(await accountCmd.get(argv.build())).to.be.true
           // @ts-ignore to access the private property
           const accountInfo = accountCmd.accountInfo
           expect(accountInfo).not.to.be.null
-          expect(accountInfo.accountId).to.equal(argv[flags.accountId.name])
+          expect(accountInfo.accountId).to.equal(argv.getValue(flags.accountId))
           expect(accountInfo.privateKey).to.be.undefined
           expect(accountInfo.publicKey).to.be.ok
           expect(accountInfo.balance).to.equal(1_110)
@@ -258,11 +257,11 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
         const ecdsaPrivateKey = PrivateKey.generateECDSA()
 
         try {
-          argv[flags.ecdsaPrivateKey.name] = ecdsaPrivateKey.toString()
-          argv[flags.setAlias.name] = true
-          configManager.update(argv)
+          argv.setValue(flags.ecdsaPrivateKey, ecdsaPrivateKey.toString())
+          argv.setValue(flags.setAlias, true)
+          configManager.update(argv.build())
 
-          expect(await accountCmd.create(argv)).to.be.true
+          expect(await accountCmd.create(argv.build())).to.be.true
 
           // @ts-ignore to access the private property
           const newAccountInfo = accountCmd.accountInfo
@@ -287,9 +286,6 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
 
 
     describe('Test SDK create account and submit transaction', () => {
-      const accountManager = bootstrapResp.opts.accountManager
-      const networkCmd = bootstrapResp.cmd.networkCmd
-
       let accountInfo: {
         accountId: string,
         privateKey: string,

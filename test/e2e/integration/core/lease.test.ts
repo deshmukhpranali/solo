@@ -25,7 +25,6 @@ import { sleep } from '../../../../src/core/helpers.js'
 import { LeaseRelinquishmentError } from '../../../../src/core/lease/lease_errors.js'
 import { NoopLeaseRenewalService } from './noop_lease_renewal_service.test.js'
 
-
 const defaultTimeout = 2 * MINUTES
 const leaseDuration = 4
 

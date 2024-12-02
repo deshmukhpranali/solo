@@ -30,6 +30,7 @@ import * as flags from '../../../src/commands/flags.js'
 import sinon from 'sinon'
 import path from 'path'
 import { BASE_TEST_DIR } from '../../test_util.js'
+import { ArgvMoc } from '../../argv_moc.js'
 
 const testLogger = logging.NewLogger('debug', true)
 
@@ -64,7 +65,7 @@ describe('BaseCommand', () => {
         chartManager,
         configManager,
         depManager,
-        localConfig
+        localConfig,
       })
     })
 
@@ -84,11 +85,12 @@ describe('BaseCommand', () => {
         flags.tlsClusterIssuerType,
         flags.valuesFile
       ]
-      const argv = {}
-      argv[flags.releaseTag.name] = 'releaseTag1'
-      argv[flags.tlsClusterIssuerType.name] = 'type2'
-      argv[flags.valuesFile.name] = 'file3'
-      configManager.update(argv)
+
+      const argv = ArgvMoc.create()
+      argv.setValue(flags.valuesFile, 'file3')
+      argv.setValue(flags.releaseTag, 'releaseTag1')
+      argv.setValue(flags.tlsClusterIssuerType, 'type2')
+      configManager.update(argv.build())
 
       const extraVars = ['var1', 'var2']
 

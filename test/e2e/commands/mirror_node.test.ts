@@ -22,7 +22,6 @@ import {
   accountCreationShouldSucceed,
   balanceQueryShouldSucceed,
   e2eTestSuite,
-  getDefaultArgv,
   HEDERA_PLATFORM_VERSION_TAG,
   TEST_CLUSTER
 } from '../../test_util.js'
@@ -34,37 +33,39 @@ import { Status, TopicCreateTransaction, TopicMessageSubmitTransaction } from '@
 import * as http from 'http'
 import { MINUTES, SECONDS } from '../../../src/core/constants.js'
 import type { PodName } from '../../../src/types/aliases.js'
+import { ArgvMoc } from '../../argv_moc.js'
 
 const testName = 'mirror-cmd-e2e'
 const namespace = testName
-const argv = getDefaultArgv()
-argv[flags.namespace.name] = namespace
-argv[flags.releaseTag.name] = HEDERA_PLATFORM_VERSION_TAG
+const argv = ArgvMoc.getDefaultArgv()
+  .setValue(flags.namespace, namespace)
+  .setValue(flags.releaseTag, HEDERA_PLATFORM_VERSION_TAG)
+  .setValue(flags.nodeAliasesUnparsed, 'node1') // use a single node to reduce resource during e2e tests
+  .setValue(flags.generateGossipKeys, true)
+  .setValue(flags.generateTlsKeys, true)
+  .setValue(flags.clusterName, TEST_CLUSTER)
+  .setValue(flags.soloChartVersion, version.SOLO_CHART_VERSION)
+  .setValue(flags.force, true)
+  .setValue(flags.relayReleaseTag, flags.relayReleaseTag.definition.defaultValue)
+  .setValue(flags.quiet, true)
 
-argv[flags.nodeAliasesUnparsed.name] = 'node1' // use a single node to reduce resource during e2e tests
-argv[flags.generateGossipKeys.name] = true
-argv[flags.generateTlsKeys.name] = true
-argv[flags.clusterName.name] = TEST_CLUSTER
-argv[flags.soloChartVersion.name] = version.SOLO_CHART_VERSION
-argv[flags.force.name] = true
-argv[flags.relayReleaseTag.name] = flags.relayReleaseTag.definition.defaultValue
-// set the env variable SOLO_CHARTS_DIR if developer wants to use local Solo charts
-argv[flags.chartDirectory.name] = process.env.SOLO_CHARTS_DIR ?? undefined
-argv[flags.quiet.name] = true
+// set the env variable SOLO_CHARTS_DIR if a developer wants to use local Solo charts
+argv.setValueWithDefault(flags.chartDirectory, process.env.SOLO_CHARTS_DIR, undefined)
 
-e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefined, undefined, true, (bootstrapResp) => {
+e2eTestSuite(testName, argv, {}, true, (bootstrapResp) => {
   describe('MirrorNodeCommand', async () => {
-    const k8 = bootstrapResp.opts.k8
-    const mirrorNodeCmd = new MirrorNodeCommand(bootstrapResp.opts)
+    const { opts } = bootstrapResp
+    const { k8, accountManager, logger } = opts
+
+    const mirrorNodeCmd = new MirrorNodeCommand(opts)
     const downloader = new core.PackageDownloader(mirrorNodeCmd.logger)
-    const accountManager = bootstrapResp.opts.accountManager
 
     const testMessage = 'Mirror node test message'
     let portForwarder = null
     let newTopicId = null
 
     before(() => {
-      bootstrapResp.opts.logger.showUser(`------------------------- START: ${testName} ----------------------------`)
+      logger.showUser(`------------------------- START: ${testName} ----------------------------`)
     })
 
     after(async function () {
@@ -74,7 +75,7 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
       await k8.deleteNamespace(namespace)
       await accountManager.close()
 
-      bootstrapResp.opts.logger.showUser(`------------------------- END: ${testName} ----------------------------`)
+      logger.showUser(`------------------------- END: ${testName} ----------------------------`)
     })
 
     // give a few ticks so that connections can close
@@ -84,7 +85,7 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
 
     it('mirror node deploy should success', async () => {
       try {
-        expect(await mirrorNodeCmd.deploy(argv)).to.be.true
+        expect(await mirrorNodeCmd.deploy(argv.build())).to.be.true
       } catch (e) {
         mirrorNodeCmd.logger.showUserError(e)
         expect.fail()
@@ -172,12 +173,12 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
               (res) => {
                 res.setEncoding('utf8')
                 res.on('data', (chunk) => {
-                  // convert chunk to json object
+                  // convert chunk to JSON object
                   const obj = JSON.parse(chunk)
                   if (obj.messages.length === 0) {
                     mirrorNodeCmd.logger.debug('No messages yet')
                   } else {
-                    // convert message from base64 to utf-8
+                    // convert a message from base64 to utf-8
                     const base64 = obj.messages[0].message
                     const buff = Buffer.from(base64, 'base64')
                     receivedMessage = buff.toString('utf-8')
@@ -203,7 +204,7 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
 
     it('mirror node destroy should success', async () => {
       try {
-        expect(await mirrorNodeCmd.destroy(argv)).to.be.true
+        expect(await mirrorNodeCmd.destroy(argv.build())).to.be.true
       } catch (e) {
         mirrorNodeCmd.logger.showUserError(e)
         expect.fail()

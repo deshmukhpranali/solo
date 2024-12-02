@@ -44,6 +44,7 @@ import {
 import crypto from 'crypto'
 import { MINUTES } from '../../../../src/core/constants.js'
 import type { PodName } from '../../../../src/types/aliases.js'
+import { ArgvMoc } from '../../../argv_moc.js'
 
 const defaultTimeout = 2 * MINUTES
 
@@ -74,7 +75,8 @@ describe('K8', () => {
   const configManager = new ConfigManager(testLogger)
   const k8 = new K8(configManager, testLogger)
   const testNamespace = 'k8-e2e'
-  const argv = []
+  const argv = ArgvMoc.create()
+
   const podName = `test-pod-${uuid4()}` as PodName
   const containerName = 'alpine'
   const podLabelValue = `test-${uuid4()}`
@@ -83,8 +85,9 @@ describe('K8', () => {
   before(async function () {
     this.timeout(defaultTimeout)
     try {
-      argv[flags.namespace.name] = testNamespace
-      configManager.update(argv)
+      argv.setValue(flags.namespace, testNamespace)
+
+      configManager.update(argv.build())
       if (!await k8.hasNamespace(testNamespace)) {
         await k8.createNamespace(testNamespace)
       }
@@ -112,8 +115,8 @@ describe('K8', () => {
     this.timeout(defaultTimeout)
     try {
       await k8.killPod(podName, testNamespace)
-      argv[flags.namespace.name] = constants.SOLO_SETUP_NAMESPACE
-      configManager.update(argv)
+      argv.setValue(flags.namespace, constants.SOLO_SETUP_NAMESPACE)
+      configManager.update(argv.build())
     } catch (e) {
       console.log(e)
       throw e

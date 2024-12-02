@@ -19,7 +19,6 @@ import { expect } from 'chai'
 
 import {
   bootstrapTestVariables,
-  getDefaultArgv,
   getTmpDir,
   HEDERA_PLATFORM_VERSION_TAG
 } from '../../test_util.js'
@@ -31,6 +30,7 @@ import fs from 'fs'
 import { NetworkCommand } from '../../../src/commands/network.js'
 import { MINUTES, SECONDS } from '../../../src/core/constants.js'
 import { flags } from '../../../src/commands/index.js'
+import { ArgvMoc } from '../../argv_moc.js'
 
 describe('NetworkCommand', () => {
   const testName = 'network-cmd-e2e'
@@ -38,29 +38,26 @@ describe('NetworkCommand', () => {
   const applicationEnvFileContents = '# row 1\n# row 2\n# row 3'
   const applicationEnvParentDirectory = path.join(getTmpDir(), 'network-command-test')
   const applicationEnvFilePath = path.join(applicationEnvParentDirectory, 'application.env')
-  const argv = getDefaultArgv()
-  argv[flags.namespace.name] = namespace
-  argv[flags.releaseTag.name] = HEDERA_PLATFORM_VERSION_TAG
-  argv[flags.nodeAliasesUnparsed.name] = 'node1'
-  argv[flags.generateGossipKeys.name] = true
-  argv[flags.generateTlsKeys.name] = true
-  argv[flags.deployMinio.name] = true
-  argv[flags.soloChartVersion.name] = version.SOLO_CHART_VERSION
-  argv[flags.force.name] = true
-  argv[flags.applicationEnv.name] = applicationEnvFilePath
-  // set the env variable SOLO_CHARTS_DIR if developer wants to use local Solo charts
-  argv[flags.chartDirectory.name] = process.env.SOLO_CHARTS_DIR ?? undefined
-  argv[flags.quiet.name] = true
 
-  const bootstrapResp = bootstrapTestVariables(testName, argv)
-  const k8 = bootstrapResp.opts.k8
-  const accountManager = bootstrapResp.opts.accountManager
-  const configManager = bootstrapResp.opts.configManager
+  const argv = ArgvMoc.getDefaultArgv()
+    .setValue(flags.namespace, namespace)
+    .setValue(flags.releaseTag, HEDERA_PLATFORM_VERSION_TAG)
+    .setValue(flags.nodeAliasesUnparsed, 'node1')
+    .setValue(flags.generateGossipKeys, true)
+    .setValue(flags.generateTlsKeys, true)
+    .setValue(flags.deployMinio, true)
+    .setValue(flags.soloChartVersion, version.SOLO_CHART_VERSION)
+    .setValue(flags.force, true)
+    .setValue(flags.applicationEnv, applicationEnvFilePath)
+    .setValue(flags.quiet, true)
 
-  const networkCmd = bootstrapResp.cmd.networkCmd
-  const clusterCmd = bootstrapResp.cmd.clusterCmd
-  const initCmd = bootstrapResp.cmd.initCmd
-  const nodeCmd = bootstrapResp.cmd.nodeCmd
+  // set the env variable SOLO_CHARTS_DIR if a developer wants to use local Solo charts
+  argv.setValueWithDefault(flags.chartDirectory, process.env.SOLO_CHARTS_DIR, undefined)
+
+  const {
+    opts: { k8, accountManager, configManager, chartManager },
+    cmd: { networkCmd, clusterCmd, initCmd, nodeCmd }
+  } = bootstrapTestVariables(testName, argv)
 
   after(async function () {
     this.timeout(3 * MINUTES)
@@ -71,19 +68,19 @@ describe('NetworkCommand', () => {
   })
 
   before(async () => {
-    await initCmd.init(argv)
-    await clusterCmd.setup(argv)
+    await initCmd.init(argv.build())
+    await clusterCmd.setup(argv.build())
     fs.mkdirSync(applicationEnvParentDirectory, { recursive: true })
     fs.writeFileSync(applicationEnvFilePath, applicationEnvFileContents)
   })
 
   it('keys should be generated', async () => {
-    expect(await nodeCmd.handlers.keys(argv)).to.be.true
+    expect(await nodeCmd.handlers.keys(argv.build())).to.be.true
   })
 
   it('network deploy command should succeed', async () => {
     try {
-      expect(await networkCmd.deploy(argv)).to.be.true
+      expect(await networkCmd.deploy(argv.build())).to.be.true
 
       // check pod names should match expected values
       await expect(k8.getPodByName('network-node1-0'))
@@ -123,13 +120,13 @@ describe('NetworkCommand', () => {
   })
 
   it('network destroy should success', async () => {
-    argv[flags.deletePvcs.name] = true
-    argv[flags.deleteSecrets.name] = true
-    argv[flags.force.name] = true
-    configManager.update(argv)
+    argv.setValue(flags.deletePvcs, true)
+    argv.setValue(flags.deleteSecrets, true)
+    argv.setValue(flags.force, true)
+    configManager.update(argv.build())
 
     try {
-      const destroyResult = await networkCmd.destroy(argv)
+      const destroyResult = await networkCmd.destroy(argv.build())
       expect(destroyResult).to.be.true
 
       while ((await k8.getPodsByLabel(['solo.hedera.com/type=network-node'])).length > 0) {
@@ -142,8 +139,8 @@ describe('NetworkCommand', () => {
         await sleep(3 * SECONDS)
       }
 
-      // check if chart is uninstalled
-      const chartInstalledStatus = await bootstrapResp.opts.chartManager.isChartInstalled(namespace, constants.SOLO_DEPLOYMENT_CHART)
+      // check if the chart is uninstalled
+      const chartInstalledStatus = await chartManager.isChartInstalled(namespace, constants.SOLO_DEPLOYMENT_CHART)
       expect(chartInstalledStatus).to.be.false
 
       // check if pvc are deleted

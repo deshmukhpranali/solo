@@ -19,31 +19,34 @@ import { expect } from 'chai'
 import each from 'mocha-each'
 
 import { flags } from '../../../src/commands/index.js'
-import { e2eTestSuite, getDefaultArgv, HEDERA_PLATFORM_VERSION_TAG, TEST_CLUSTER } from '../../test_util.js'
+import { e2eTestSuite, HEDERA_PLATFORM_VERSION_TAG, TEST_CLUSTER } from '../../test_util.js'
 import * as version from '../../../version.js'
 import { getNodeLogs, sleep } from '../../../src/core/helpers.js'
 import { RelayCommand } from '../../../src/commands/relay.js'
 import { MINUTES } from '../../../src/core/constants.js'
+import { ArgvMoc } from '../../argv_moc.js'
 
 const testName = 'relay-cmd-e2e'
 const namespace = testName
-const argv = getDefaultArgv()
-argv[flags.namespace.name] = namespace
-argv[flags.releaseTag.name] = HEDERA_PLATFORM_VERSION_TAG
-argv[flags.nodeAliasesUnparsed.name] = 'node1,node2'
-argv[flags.generateGossipKeys.name] = true
-argv[flags.generateTlsKeys.name] = true
-argv[flags.clusterName.name] = TEST_CLUSTER
-argv[flags.soloChartVersion.name] = version.SOLO_CHART_VERSION
-argv[flags.force.name] = true
-argv[flags.relayReleaseTag.name] = flags.relayReleaseTag.definition.defaultValue
-argv[flags.quiet.name] = true
 
-e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefined, undefined, true, (bootstrapResp) => {
+const argv = ArgvMoc.getDefaultArgv()
+  .setValue(flags.namespace, namespace)
+  .setValue(flags.releaseTag, HEDERA_PLATFORM_VERSION_TAG)
+  .setValue(flags.nodeAliasesUnparsed, 'node1,node2')
+  .setValue(flags.generateGossipKeys, true)
+  .setValue(flags.generateTlsKeys, true)
+  .setValue(flags.clusterName, TEST_CLUSTER)
+  .setValue(flags.soloChartVersion, version.SOLO_CHART_VERSION)
+  .setValue(flags.force, true)
+  .setValue(flags.relayReleaseTag, flags.relayReleaseTag.definition.defaultValue)
+  .setValue(flags.quiet, true)
+
+e2eTestSuite(testName, argv, {}, true, (bootstrapResp) => {
   describe('RelayCommand', async () => {
-    const k8 = bootstrapResp.opts.k8
-    const configManager = bootstrapResp.opts.configManager
-    const relayCmd = new RelayCommand(bootstrapResp.opts)
+    const { opts } = bootstrapResp
+    const { k8, configManager } = opts
+
+    const relayCmd = new RelayCommand(opts)
 
     after(async () => {
       await getNodeLogs(k8, namespace)
@@ -56,12 +59,12 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
     .it('relay deploy and destroy should work with $value', async function (relayNodes) {
       this.timeout(5 * MINUTES)
 
-      argv[flags.nodeAliasesUnparsed.name] = relayNodes
-      configManager.update(argv)
+      argv.setValue(flags.nodeAliasesUnparsed, relayNodes)
+      configManager.update(argv.build())
 
       // test relay deploy
       try {
-        expect(await relayCmd.deploy(argv)).to.be.true
+        expect(await relayCmd.deploy(argv.build())).to.be.true
       } catch (e) {
         relayCmd.logger.showUserError(e)
         expect.fail()
@@ -75,7 +78,7 @@ e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefin
 
       // test relay destroy
       try {
-        expect(await relayCmd.destroy(argv)).to.be.true
+        expect(await relayCmd.destroy(argv.build())).to.be.true
       } catch (e) {
         relayCmd.logger.showUserError(e)
         expect.fail()

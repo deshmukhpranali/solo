@@ -20,7 +20,6 @@ import { expect } from 'chai'
 import { flags } from '../../../src/commands/index.js'
 import {
   e2eTestSuite,
-  getDefaultArgv,
   HEDERA_PLATFORM_VERSION_TAG
 } from '../../test_util.js'
 import { getNodeLogs } from '../../../src/core/helpers.js'
@@ -29,25 +28,25 @@ import {
   DOWNLOAD_GENERATED_FILES_CONFIGS_NAME
 } from '../../../src/commands/node/configs.js'
 import { MINUTES } from '../../../src/core/constants.js'
+import { ArgvMoc } from '../../argv_moc.js'
 
 const namespace = 'node-upgrade'
-const argv = getDefaultArgv()
-argv[flags.nodeAliasesUnparsed.name] = 'node1,node2,node3'
-argv[flags.generateGossipKeys.name] = true
-argv[flags.generateTlsKeys.name] = true
-argv[flags.persistentVolumeClaims.name] = true
-// set the env variable SOLO_CHARTS_DIR if developer wants to use local solo charts
-argv[flags.chartDirectory.name] = process.env.SOLO_CHARTS_DIR ? process.env.SOLO_CHARTS_DIR : undefined
-argv[flags.releaseTag.name] = HEDERA_PLATFORM_VERSION_TAG
-argv[flags.namespace.name] = namespace
+const argv = ArgvMoc.getDefaultArgv()
+  .setValue(flags.nodeAliasesUnparsed, 'node1,node2,node3')
+  .setValue(flags.generateGossipKeys, true)
+  .setValue(flags.generateTlsKeys, true)
+  .setValue(flags.persistentVolumeClaims, true)
+  .setValue(flags.releaseTag, HEDERA_PLATFORM_VERSION_TAG)
+  .setValue(flags.namespace, namespace)
 
-const upgradeArgv = getDefaultArgv()
+// set the env variable SOLO_CHARTS_DIR if a developer wants to use local solo charts
+argv.setValueWithDefault(flags.chartDirectory, process.env.SOLO_CHARTS_DIR, undefined)
 
-e2eTestSuite(namespace, argv, undefined, undefined, undefined, undefined, undefined, undefined, true, (bootstrapResp) => {
+const upgradeArgv = ArgvMoc.getDefaultArgv()
+
+e2eTestSuite(namespace, argv, {}, true, (bootstrapResp) => {
   describe('Node upgrade', async () => {
-    const nodeCmd = bootstrapResp.cmd.nodeCmd
-    const accountCmd = bootstrapResp.cmd.accountCmd
-    const k8 = bootstrapResp.opts.k8
+    const { opts: { k8, accountManager }, cmd: { nodeCmd, accountCmd } } = bootstrapResp
 
     after(async function () {
       this.timeout(10 * MINUTES)
@@ -57,7 +56,7 @@ e2eTestSuite(namespace, argv, undefined, undefined, undefined, undefined, undefi
     })
 
     it('should succeed with init command', async () => {
-      const status = await accountCmd.init(argv)
+      const status = await accountCmd.init(argv.build())
       expect(status).to.be.ok
     }).timeout(8 * MINUTES)
 
@@ -82,7 +81,7 @@ e2eTestSuite(namespace, argv, undefined, undefined, undefined, undefined, undefi
         flags.devMode.constName
       ])
 
-      await bootstrapResp.opts.accountManager.close()
+      await accountManager.close()
     }).timeout(5 * MINUTES)
   })
 })

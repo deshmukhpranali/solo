@@ -23,58 +23,59 @@ import {
   accountCreationShouldSucceed,
   balanceQueryShouldSucceed,
   e2eTestSuite,
-  getDefaultArgv, getNodeAliasesPrivateKeysHash, getTmpDir,
+  getNodeAliasesPrivateKeysHash, getTmpDir,
   HEDERA_PLATFORM_VERSION_TAG
 } from '../../test_util.js'
 import { getNodeLogs } from '../../../src/core/helpers.js'
 import { HEDERA_HAPI_PATH, MINUTES, ROOT_CONTAINER } from '../../../src/core/constants.js'
 import fs from 'fs'
-import type { PodName } from '../../../src/types/aliases.js'
+import type { NodeAlias, PodName } from '../../../src/types/aliases.js'
 import * as NodeCommandConfigs from '../../../src/commands/node/configs.js'
+import type { NetworkNodeServices } from '../../../src/core/network_node_services.js'
+import { ArgvMoc } from '../../argv_moc.js'
 
 const defaultTimeout = 2 * MINUTES
 const namespace = 'node-update-separate'
 const updateNodeId = 'node2'
 const newAccountId = '0.0.7'
-const argv = getDefaultArgv()
-argv[flags.nodeAliasesUnparsed.name] = 'node1,node2,node3'
-argv[flags.nodeAlias.name] = updateNodeId
 
-argv[flags.newAccountNumber.name] = newAccountId
-argv[flags.newAdminKey.name] = '302e020100300506032b6570042204200cde8d512569610f184b8b399e91e46899805c6171f7c2b8666d2a417bcc66c2'
+const argv = ArgvMoc.getDefaultArgv()
+  .setValue(flags.nodeAliasesUnparsed, 'node1,node2,node3')
+  .setValue(flags.nodeAlias, updateNodeId)
+  .setValue(flags.newAccountNumber, newAccountId)
+  .setValue(flags.newAdminKey, '302e020100300506032b6570042204200cde8d512569610f184b8b399e91e46899805c6171f7c2b8666d2a417bcc66c2')
+  .setValue(flags.generateGossipKeys, true)
+  .setValue(flags.generateTlsKeys, true)
+  .setValue(flags.releaseTag, HEDERA_PLATFORM_VERSION_TAG)
+  .setValue(flags.namespace, namespace)
+  .setValue(flags.persistentVolumeClaims, true)
+  .setValue(flags.quiet, true)
 
-argv[flags.generateGossipKeys.name] = true
-argv[flags.generateTlsKeys.name] = true
-// set the env variable SOLO_CHARTS_DIR if developer wants to use local Solo charts
-argv[flags.chartDirectory.name] = process.env.SOLO_CHARTS_DIR ?? undefined
-argv[flags.releaseTag.name] = HEDERA_PLATFORM_VERSION_TAG
-argv[flags.namespace.name] = namespace
-argv[flags.persistentVolumeClaims.name] = true
-argv[flags.quiet.name] = true
+//set the env variable SOLO_CHARTS_DIR if a developer wants to use local Solo charts
+argv.setValueWithDefault(flags.chartDirectory, process.env.SOLO_CHARTS_DIR, undefined)
 
-e2eTestSuite(namespace, argv, undefined, undefined, undefined, undefined, undefined, undefined, true, (bootstrapResp) => {
+e2eTestSuite(namespace, argv, {}, true, (bootstrapResp) => {
   describe('Node update via separated commands', async () => {
-    const nodeCmd = bootstrapResp.cmd.nodeCmd
-    const accountCmd = bootstrapResp.cmd.accountCmd
-    const k8 = bootstrapResp.opts.k8
-    let existingServiceMap
-    let existingNodeIdsPrivateKeysHash
+    const { opts: { k8, accountManager, keyManager, logger }, cmd: { nodeCmd, accountCmd } } = bootstrapResp
+
+    let existingServiceMap: Map<NodeAlias, NetworkNodeServices>
+    let existingNodeIdsPrivateKeysHash: Map<NodeAlias, Map<string, string>>
 
     after(async function () {
       this.timeout(10 * MINUTES)
 
       await getNodeLogs(k8, namespace)
-      await nodeCmd.handlers.stop(argv)
+      await nodeCmd.handlers.stop(argv.build())
       await k8.deleteNamespace(namespace)
     })
 
     it('cache current version of private keys', async () => {
-      existingServiceMap = await bootstrapResp.opts.accountManager.getNodeServiceMap(namespace)
+      existingServiceMap = await accountManager.getNodeServiceMap(namespace)
       existingNodeIdsPrivateKeysHash = await getNodeAliasesPrivateKeysHash(existingServiceMap, namespace, k8, getTmpDir())
     }).timeout(8 * MINUTES)
 
     it('should succeed with init command', async () => {
-      const status = await accountCmd.init(argv)
+      const status = await accountCmd.init(argv.build())
       expect(status).to.be.ok
     }).timeout(8 * MINUTES)
 
@@ -82,28 +83,29 @@ e2eTestSuite(namespace, argv, undefined, undefined, undefined, undefined, undefi
       // generate gossip and tls keys for the updated node
       const tmpDir = getTmpDir()
 
-      const signingKey = await bootstrapResp.opts.keyManager.generateSigningKey(updateNodeId)
-      const signingKeyFiles = await bootstrapResp.opts.keyManager.storeSigningKey(updateNodeId, signingKey, tmpDir)
-      nodeCmd.logger.debug(`generated test gossip signing keys for node ${updateNodeId} : ${signingKeyFiles.certificateFile}`)
-      argv[flags.gossipPublicKey.name] = signingKeyFiles.certificateFile
-      argv[flags.gossipPrivateKey.name] = signingKeyFiles.privateKeyFile
+      const signingKey = await keyManager.generateSigningKey(updateNodeId)
+      const signingKeyFiles = await keyManager.storeSigningKey(updateNodeId, signingKey, tmpDir)
+      logger.debug(`generated test gossip signing keys for node ${updateNodeId} : ${signingKeyFiles.certificateFile}`)
 
-      const tlsKey = await bootstrapResp.opts.keyManager.generateGrpcTlsKey(updateNodeId)
-      const tlsKeyFiles = await bootstrapResp.opts.keyManager.storeTLSKey(updateNodeId, tlsKey, tmpDir)
-      nodeCmd.logger.debug(`generated test TLS keys for node ${updateNodeId} : ${tlsKeyFiles.certificateFile}`)
-      argv[flags.tlsPublicKey.name] = tlsKeyFiles.certificateFile
-      argv[flags.tlsPrivateKey.name] = tlsKeyFiles.privateKeyFile
+      argv
+        .setValue(flags.gossipPublicKey, signingKeyFiles.certificateFile)
+        .setValue(flags.gossipPrivateKey, signingKeyFiles.privateKeyFile)
+
+      const tlsKey = await keyManager.generateGrpcTlsKey(updateNodeId)
+      const tlsKeyFiles = await keyManager.storeTLSKey(updateNodeId, tlsKey, tmpDir)
+      logger.debug(`generated test TLS keys for node ${updateNodeId} : ${tlsKeyFiles.certificateFile}`)
+
+      argv
+        .setValue(flags.tlsPublicKey, tlsKeyFiles.certificateFile)
+        .setValue(flags.tlsPrivateKey, tlsKeyFiles.privateKeyFile)
 
       const tempDir = 'contextDir'
-      const argvPrepare = Object.assign({}, argv)
-      argvPrepare[flags.outputDir.name] = tempDir
+      const argvPrepare = argv.clone().setValue(flags.outputDir, tempDir)
+      const argvExecute = ArgvMoc.getDefaultArgv().setValue(flags.inputDir, tempDir)
 
-      const argvExecute = Object.assign({}, getDefaultArgv())
-      argvExecute[flags.inputDir.name] = tempDir
-
-      await nodeCmd.handlers.updatePrepare(argvPrepare)
-      await nodeCmd.handlers.updateSubmitTransactions(argvExecute)
-      await nodeCmd.handlers.updateExecute(argvExecute)
+      await nodeCmd.handlers.updatePrepare(argvPrepare.build())
+      await nodeCmd.handlers.updateSubmitTransactions(argvExecute.build())
+      await nodeCmd.handlers.updateExecute(argvExecute.build())
 
       expect(nodeCmd.getUnusedConfigs(NodeCommandConfigs.UPDATE_CONFIGS_NAME)).to.deep.equal([
         flags.devMode.constName,
@@ -113,12 +115,12 @@ e2eTestSuite(namespace, argv, undefined, undefined, undefined, undefined, undefi
         flags.grpcEndpoints.constName,
         'freezeAdminPrivateKey'
       ])
-      await bootstrapResp.opts.accountManager.close()
+      await accountManager.close()
     }).timeout(30 * MINUTES)
 
-    balanceQueryShouldSucceed(bootstrapResp.opts.accountManager, nodeCmd, namespace)
+    balanceQueryShouldSucceed(accountManager, nodeCmd, namespace)
 
-    accountCreationShouldSucceed(bootstrapResp.opts.accountManager, nodeCmd, namespace)
+    accountCreationShouldSucceed(accountManager, nodeCmd, namespace)
 
     it('signing key and tls key should not match previous one', async () => {
       const currentNodeIdsPrivateKeysHash = await getNodeAliasesPrivateKeysHash(existingServiceMap, namespace, k8, getTmpDir())
@@ -140,7 +142,7 @@ e2eTestSuite(namespace, argv, undefined, undefined, undefined, undefined, undefi
     }).timeout(defaultTimeout)
 
     it('config.txt should be changed with new account id', async () => {
-      // read config.txt file from first node, read config.txt line by line, it should not contain value of newAccountId
+      // read config.txt file from the first node, read config.txt line by line, it should not contain value of newAccountId
       const pods = await k8.getPodsByLabel(['solo.hedera.com/type=network-node'])
       const podName = pods[0].metadata.name as PodName
       const tmpDir = getTmpDir()

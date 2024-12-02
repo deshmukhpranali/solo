@@ -25,7 +25,6 @@ import { sleep } from '../../../../src/core/helpers.js'
 import { IntervalLeaseRenewalService } from '../../../../src/core/lease/lease_renewal.js'
 import { type V1Lease } from '@kubernetes/client-node'
 
-
 const defaultTimeout = 2 * MINUTES
 const leaseDuration = 4
 
