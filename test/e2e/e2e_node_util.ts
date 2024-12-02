@@ -22,7 +22,6 @@ import {
   accountCreationShouldSucceed,
   balanceQueryShouldSucceed,
   e2eTestSuite,
-  getDefaultArgv,
   HEDERA_PLATFORM_VERSION_TAG,
   TEST_CLUSTER, testLogger
 } from '../test_util.js'
@@ -32,29 +31,29 @@ import { MINUTES, SECONDS } from '../../src/core/constants.js'
 import type { NodeAlias } from '../../src/types/aliases.js'
 import type { ListrTaskWrapper } from 'listr2'
 import { ConfigManager, type K8 } from '../../src/core/index.js'
-import { type NodeCommand } from '../../src/commands/node/index.js'
+import type { NodeCommand } from '../../src/commands/node/index.js'
+import { ArgvMoc } from '../argv_moc.js'
 
 export function e2eNodeKeyRefreshTest (testName: string, mode: string, releaseTag = HEDERA_PLATFORM_VERSION_TAG) {
   const namespace = testName
-  const argv = getDefaultArgv()
-  argv[flags.namespace.name] = namespace
-  argv[flags.releaseTag.name] = releaseTag
-  argv[flags.nodeAliasesUnparsed.name] = 'node1,node2,node3'
-  argv[flags.generateGossipKeys.name] = true
-  argv[flags.generateTlsKeys.name] = true
-  argv[flags.clusterName.name] = TEST_CLUSTER
-  argv[flags.devMode.name] = true
-  // set the env variable SOLO_CHARTS_DIR if developer wants to use local Solo charts
-  argv[flags.chartDirectory.name] = process.env.SOLO_CHARTS_DIR ?? undefined
-  argv[flags.quiet.name] = true
+  const argv = ArgvMoc.getDefaultArgv()
+    .setValue(flags.namespace, namespace)
+    .setValue(flags.releaseTag, releaseTag)
+    .setValue(flags.nodeAliasesUnparsed, 'node1,node2,node3')
+    .setValue(flags.generateGossipKeys, true)
+    .setValue(flags.generateTlsKeys, true)
+    .setValue(flags.clusterName, TEST_CLUSTER)
+    .setValue(flags.devMode, true)
+    .setValue(flags.quiet, true)
 
-  e2eTestSuite(testName, argv, undefined, undefined, undefined, undefined, undefined, undefined, true, (bootstrapResp) => {
+  //set the env variable SOLO_CHARTS_DIR if a developer wants to use local Solo charts
+  argv.setValueWithDefault(flags.chartDirectory, process.env.SOLO_CHARTS_DIR, undefined)
+
+  e2eTestSuite(testName, argv, {}, true, (bootstrapResp) => {
     const defaultTimeout = 2 * MINUTES
 
     describe(`NodeCommand [testName ${testName}, mode ${mode}, release ${releaseTag}]`, async () => {
-      const accountManager = bootstrapResp.opts.accountManager
-      const k8 = bootstrapResp.opts.k8
-      const nodeCmd = bootstrapResp.cmd.nodeCmd
+      const { opts: { accountManager, k8 }, cmd: { nodeCmd } } = bootstrapResp
 
       afterEach(async function () {
         this.timeout(defaultTimeout)
@@ -104,7 +103,7 @@ export function e2eNodeKeyRefreshTest (testName: string, mode: string, releaseTa
             expect(resp.response.statusCode).to.equal(200)
             await sleep(20 * SECONDS) // sleep to wait for pod to finish terminating
           } else if (mode === 'stop') {
-            expect(await nodeCmd.handlers.stop(argv)).to.be.true
+            expect(await nodeCmd.handlers.stop(argv.build())).to.be.true
             await sleep(20 * SECONDS) // give time for node to stop and update its logs
           } else {
             throw new Error(`invalid mode: ${mode}`)
@@ -137,10 +136,10 @@ export function e2eNodeKeyRefreshTest (testName: string, mode: string, releaseTa
         }).timeout(defaultTimeout)
       }
 
-      function nodeRefreshShouldSucceed (nodeAlias: NodeAlias, nodeCmd: NodeCommand, argv: Record<any, any>) {
+      function nodeRefreshShouldSucceed (nodeAlias: NodeAlias, nodeCmd: NodeCommand, argv: ArgvMoc) {
         it(`${nodeAlias} refresh should succeed`, async () => {
           try {
-            expect(await nodeCmd.handlers.refresh(argv)).to.be.true
+            expect(await nodeCmd.handlers.refresh(argv.build())).to.be.true
             expect(nodeCmd.getUnusedConfigs(
                 NodeCommandConfigs.REFRESH_CONFIGS_NAME)).to.deep.equal([
               flags.devMode.constName,
@@ -172,10 +171,10 @@ export function e2eNodeKeyRefreshTest (testName: string, mode: string, releaseTa
         }).timeout(defaultTimeout)
       }
 
-      async function nodeRefreshTestSetup (argv: Record<any, any>, testName: string, k8: K8, nodeAliases: string) {
-        argv[flags.nodeAliasesUnparsed.name] = nodeAliases
+      async function nodeRefreshTestSetup (argv: ArgvMoc, testName: string, k8: K8, nodeAliases: string) {
+        argv.setValue(flags.nodeAliasesUnparsed, nodeAliases)
         const configManager = new ConfigManager(testLogger)
-        configManager.update(argv)
+        configManager.update(argv.build())
 
         const podArray = await k8.getPodsByLabel(
             [`app=network-${nodeAliases}`,

@@ -18,27 +18,27 @@ import { it, describe, after } from 'mocha'
 import { expect } from 'chai'
 
 import { flags } from '../../../../src/commands/index.js'
-import { e2eTestSuite, getDefaultArgv, TEST_CLUSTER } from '../../../test_util.js'
+import { e2eTestSuite, TEST_CLUSTER } from '../../../test_util.js'
 import * as version from '../../../../version.js'
 import { MINUTES } from '../../../../src/core/constants.js'
 import type { PodName } from '../../../../src/types/aliases.js'
+import { ArgvMoc } from '../../../argv_moc.js'
 
 const namespace = 'account-mngr-e2e'
-const argv = getDefaultArgv()
-argv[flags.namespace.name] = namespace
-argv[flags.nodeAliasesUnparsed.name] = 'node1'
-argv[flags.clusterName.name] = TEST_CLUSTER
-argv[flags.soloChartVersion.name] = version.SOLO_CHART_VERSION
-argv[flags.generateGossipKeys.name] = true
-argv[flags.generateTlsKeys.name] = true
-// set the env variable SOLO_CHARTS_DIR if developer wants to use local Solo charts
-argv[flags.chartDirectory.name] = process.env.SOLO_CHARTS_DIR ?? undefined
 
-e2eTestSuite(namespace, argv, undefined, undefined, undefined, undefined, undefined, undefined, false, (bootstrapResp) => {
+const argv = ArgvMoc.getDefaultArgv()
+  .setValue(flags.namespace, namespace)
+  .setValue(flags.nodeAliasesUnparsed, 'node1')
+  .setValue(flags.clusterName, TEST_CLUSTER)
+  .setValue(flags.soloChartVersion, version.SOLO_CHART_VERSION)
+  .setValue(flags.generateGossipKeys, true)
+  .setValue(flags.generateTlsKeys, true)
+
+argv.setValueWithDefault(flags.chartDirectory, process.env.SOLO_CHARTS_DIR, undefined)
+
+e2eTestSuite(namespace, argv, {}, false, (bootstrapResp) => {
   describe('AccountManager', async () => {
-    const k8 = bootstrapResp.opts.k8
-    const accountManager = bootstrapResp.opts.accountManager
-    const configManager = bootstrapResp.opts.configManager
+    const { opts: { k8, accountManager, configManager } } = bootstrapResp
 
     after(async function () {
       this.timeout(3 * MINUTES)

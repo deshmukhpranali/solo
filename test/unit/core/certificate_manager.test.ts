@@ -22,10 +22,11 @@ import { CertificateManager, ConfigManager, K8 } from '../../../src/core/index.j
 import { flags } from '../../../src/commands/index.js'
 import { testLogger } from '../../test_util.js'
 import { SoloError } from '../../../src/core/errors.js'
+import { ArgvMoc } from '../../argv_moc.js'
 
 describe('Certificate Manager', () => {
+  const argv = ArgvMoc.create()
 
-  const argv = {}
   // @ts-ignore
   const k8InitSpy = jest.spyOn(K8.prototype, 'init').mockImplementation(() => {})
   const k8CreateSecret = jest.spyOn(K8.prototype, 'createSecret').mockResolvedValue(true)
@@ -33,9 +34,9 @@ describe('Certificate Manager', () => {
   let certificateManager: CertificateManager
 
   before(() => {
-    argv[flags.namespace.name] = 'namespace'
+    argv.setValue(flags.namespace, 'namespace')
     const configManager = new ConfigManager(testLogger)
-    configManager.update(argv)
+    configManager.update(argv.build())
     k8 = new K8(configManager, testLogger)
     certificateManager = new CertificateManager(k8, testLogger, configManager)
   })

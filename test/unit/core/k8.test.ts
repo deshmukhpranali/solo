@@ -22,6 +22,7 @@ import { ConfigManager, constants, K8 } from '../../../src/core/index.js'
 import { testLogger } from '../../test_util.js'
 import { flags } from '../../../src/commands/index.js'
 import { SECONDS } from '../../../src/core/constants.js'
+import { ArgvMoc } from '../../argv_moc.js'
 
 function listNamespacedPodMockSetup (k8: K8, numOfFailures: number, result: any) {
   for (let i = 0; i < numOfFailures - 1; i++) { // @ts-ignore
@@ -43,7 +44,8 @@ const defaultTimeout = 20 * SECONDS
 describe('K8 Unit Tests', function () {
   this.timeout(defaultTimeout)
 
-  const argv = {}
+  const argv = ArgvMoc.create()
+
   const expectedResult = [
     {
       metadata: { name: 'pod' },
@@ -63,9 +65,9 @@ describe('K8 Unit Tests', function () {
   let k8: K8
 
   before(() => {
-    argv[flags.namespace.name] = 'namespace'
+    argv.setValue(flags.namespace, 'namespace')
     const configManager = new ConfigManager(testLogger)
-    configManager.update(argv)
+    configManager.update(argv.build())
     k8 = new K8(configManager, testLogger)
     k8.kubeClient = {
       // @ts-ignore

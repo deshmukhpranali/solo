@@ -45,7 +45,7 @@ import {
   ProfileManager,
   Templates,
   Zippy,
-  AccountManager, CertificateManager, LocalConfig
+  AccountManager, CertificateManager, LocalConfig,
 } from '../src/core/index.js'
 import {
   AccountBalanceQuery,
@@ -62,9 +62,9 @@ import type { SoloLogger } from '../src/core/logging.js'
 import type { BaseCommand } from '../src/commands/base.js'
 import type { NodeAlias } from '../src/types/aliases.js'
 import type { NetworkNodeServices } from '../src/core/network_node_services.js'
-import sinon from 'sinon'
 import { HEDERA_PLATFORM_VERSION } from '../version.js'
 import { IntervalLeaseRenewalService } from '../src/core/lease/lease_renewal.js'
+import type { ArgvMoc } from './argv_moc.js'
 
 export const testLogger = logging.NewLogger('debug', true)
 export const TEST_CLUSTER = 'solo-e2e'
@@ -72,7 +72,7 @@ export const HEDERA_PLATFORM_VERSION_TAG = HEDERA_PLATFORM_VERSION
 
 export const BASE_TEST_DIR = path.join('test', 'data', 'tmp')
 
-export function getTestCacheDir (testName?: string) {
+export function getTestCacheDir (testName?: string): string {
   const d = testName ? path.join(BASE_TEST_DIR, testName) : BASE_TEST_DIR
 
   if (!fs.existsSync(d)) {
@@ -81,18 +81,8 @@ export function getTestCacheDir (testName?: string) {
   return d
 }
 
-export function getTmpDir () {
+export function getTmpDir (): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'solo-'))
-}
-
-/** Get argv with defaults */
-export function getDefaultArgv () {
-  const argv: Record<string, any> = {}
-  for (const f of flags.allFlags) {
-    argv[f.name] = f.definition.defaultValue
-  }
-
-  return argv
 }
 
 interface TestOpts {
@@ -116,9 +106,6 @@ interface TestOpts {
 interface BootstrapResponse {
   namespace: string,
   opts: TestOpts,
-  manager: {
-    accountManager: AccountManager
-  },
   cmd: {
     initCmd: InitCommand,
     clusterCmd: ClusterCommand,
@@ -128,21 +115,23 @@ interface BootstrapResponse {
   }
 }
 
+interface CmdArg  {
+  k8Arg?: K8
+  initCmdArg?: InitCommand
+  clusterCmdArg?: ClusterCommand
+  networkCmdArg?: NetworkCommand
+  nodeCmdArg?: NodeCommand
+  accountCmdArg?: AccountCommand
+}
+
 /** Initialize common test variables */
-export function bootstrapTestVariables (
-    testName: string,
-    argv: any,
-    k8Arg: K8 | null = null,
-    initCmdArg: InitCommand | null = null,
-    clusterCmdArg: ClusterCommand | null = null,
-    networkCmdArg: NetworkCommand | null = null,
-    nodeCmdArg: NodeCommand | null = null,
-    accountCmdArg: AccountCommand | null = null
-): BootstrapResponse {
-  const namespace: string = argv[flags.namespace.name] || 'bootstrap-ns'
-  const cacheDir: string = argv[flags.cacheDir.name] || getTestCacheDir(testName)
+export function bootstrapTestVariables (testName: string, argv: ArgvMoc, cmdArg: CmdArg = {}): BootstrapResponse {
+  const namespace= argv.setValueIfIsNotSet(flags.namespace, 'bootstrap-ns')
+  const cacheDir = argv.setValueIfIsNotSet(flags.cacheDir, getTestCacheDir(testName))
+
   const configManager = new ConfigManager(testLogger)
-  configManager.update(argv)
+  configManager.update(argv.build())
+
   const downloader = new PackageDownloader(testLogger)
   const zippy = new Zippy(testLogger)
   const helmDepManager = new HelmDependencyManager(downloader, zippy, testLogger)
@@ -151,7 +140,9 @@ export function bootstrapTestVariables (
   const keyManager = new KeyManager(testLogger)
   const helm = new Helm(testLogger)
   const chartManager = new ChartManager(helm, testLogger)
-  const k8 = k8Arg || new K8(configManager, testLogger)
+
+  const k8 = cmdArg.k8Arg || new K8(configManager, testLogger)
+
   const accountManager = new AccountManager(testLogger, k8)
   const platformInstaller = new PlatformInstaller(testLogger, k8, configManager)
   const profileManager = new ProfileManager(testLogger, configManager)
@@ -174,20 +165,18 @@ export function bootstrapTestVariables (
     profileManager,
     leaseManager,
     certificateManager,
-    localConfig
+    localConfig,
   }
 
-  const initCmd = initCmdArg || new InitCommand(opts)
-  const clusterCmd = clusterCmdArg || new ClusterCommand(opts)
-  const networkCmd = networkCmdArg || new NetworkCommand(opts)
-  const nodeCmd = nodeCmdArg || new NodeCommand(opts)
-  const accountCmd = accountCmdArg || new AccountCommand(opts, constants.SHORTER_SYSTEM_ACCOUNTS)
+  const initCmd = cmdArg.initCmdArg || new InitCommand(opts)
+  const clusterCmd = cmdArg.clusterCmdArg || new ClusterCommand(opts)
+  const networkCmd = cmdArg.networkCmdArg || new NetworkCommand(opts)
+  const nodeCmd = cmdArg.nodeCmdArg || new NodeCommand(opts)
+  const accountCmd = cmdArg.accountCmdArg || new AccountCommand(opts, constants.SHORTER_SYSTEM_ACCOUNTS)
+
   return {
     namespace,
     opts,
-    manager: {
-      accountManager
-    },
     cmd: {
       initCmd,
       clusterCmd,
@@ -200,19 +189,13 @@ export function bootstrapTestVariables (
 
 /** Bootstrap network in a given namespace, then run the test call back providing the bootstrap response */
 export function e2eTestSuite (
-    testName: string,
-    argv: Record<any, any>,
-    k8Arg: K8 | null = null,
-    initCmdArg: InitCommand | null = null,
-    clusterCmdArg: ClusterCommand | null = null,
-    networkCmdArg: NetworkCommand | null = null,
-    nodeCmdArg: NodeCommand | null = null,
-    accountCmdArg: AccountCommand | null = null,
-    startNodes = true,
-    testsCallBack: (bootstrapResp: BootstrapResponse) => void = () => {
-    }
-) {
-  const bootstrapResp = bootstrapTestVariables(testName, argv, k8Arg, initCmdArg, clusterCmdArg, networkCmdArg, nodeCmdArg, accountCmdArg)
+  testName: string,
+  argv: ArgvMoc,
+  cmdArg: CmdArg,
+  startNodes = true,
+  testsCallBack: (bootstrapResp: BootstrapResponse) => void = () => {}
+): void {
+  const bootstrapResp = bootstrapTestVariables(testName, argv, cmdArg)
   const namespace = bootstrapResp.namespace
   const initCmd = bootstrapResp.cmd.initCmd
   const k8 = bootstrapResp.opts.k8
@@ -222,9 +205,9 @@ export function e2eTestSuite (
   const chartManager = bootstrapResp.opts.chartManager
 
   describe(`E2E Test Suite for '${testName}'`, function () {
-    this.bail(true) // stop on first failure, nothing else will matter if network doesn't come up correctly
+    this.bail(true) // stop on first failure, nothing else will matter if the network doesn't come up correctly
 
-    describe(`Bootstrap network for test [release ${argv[flags.releaseTag.name]}}]`, () => {
+    describe(`Bootstrap network for test [release ${argv.getValue(flags.releaseTag)}}]`, () => {
       before(() => {
         bootstrapResp.opts.logger.showUser(`------------------------- START: bootstrap (${testName}) ----------------------------`)
       })
@@ -236,7 +219,7 @@ export function e2eTestSuite (
       })
 
       it('should cleanup previous deployment', async () => {
-        await initCmd.init(argv)
+        await initCmd.init(argv.build())
 
         if (await k8.hasNamespace(namespace)) {
           await k8.deleteNamespace(namespace)
@@ -248,12 +231,12 @@ export function e2eTestSuite (
         }
 
         if (!await chartManager.isChartInstalled(constants.SOLO_SETUP_NAMESPACE, constants.SOLO_CLUSTER_SETUP_CHART)) {
-          await clusterCmd.setup(argv)
+          await clusterCmd.setup(argv.build())
         }
       }).timeout(2 * MINUTES)
 
       it('generate key files', async () => {
-        expect(await nodeCmd.handlers.keys(argv)).to.be.true
+        expect(await nodeCmd.handlers.keys(argv.build())).to.be.true
         expect(nodeCmd.getUnusedConfigs(NodeCommandConfigs.KEYS_CONFIGS_NAME)).to.deep.equal([
           flags.devMode.constName,
           flags.quiet.constName
@@ -261,7 +244,7 @@ export function e2eTestSuite (
       }).timeout(2 * MINUTES)
 
       it('should succeed with network deploy', async () => {
-        await networkCmd.deploy(argv)
+        await networkCmd.deploy(argv.build())
 
         expect(networkCmd.getUnusedConfigs(NetworkCommand.DEPLOY_CONFIGS_NAME)).to.deep.equal([
           flags.apiPermissionProperties.constName,
@@ -284,7 +267,7 @@ export function e2eTestSuite (
         it('should succeed with node setup command', async () => {
           // cache this, because `solo node setup.finalize()` will reset it to false
           try {
-            expect(await nodeCmd.handlers.setup(argv)).to.be.true
+            expect(await nodeCmd.handlers.setup(argv.build())).to.be.true
             expect(nodeCmd.getUnusedConfigs(NodeCommandConfigs.SETUP_CONFIGS_NAME)).to.deep.equal([
               flags.devMode.constName
             ])
@@ -296,7 +279,7 @@ export function e2eTestSuite (
 
         it('should succeed with node start command', async () => {
           try {
-            expect(await nodeCmd.handlers.start(argv)).to.be.true
+            expect(await nodeCmd.handlers.start(argv.build())).to.be.true
           } catch (e) {
             nodeCmd.logger.showUserError(e)
             expect.fail()
@@ -304,7 +287,7 @@ export function e2eTestSuite (
         }).timeout(30 * MINUTES)
 
         it('node log command should work', async () => {
-          expect(await nodeCmd.handlers.logs(argv)).to.be.true
+          expect(await nodeCmd.handlers.logs(argv.build())).to.be.true
 
           const soloLogPath = path.join(SOLO_LOGS_DIR, 'solo.log')
           const soloLog = fs.readFileSync(soloLogPath, 'utf8')
@@ -328,8 +311,8 @@ export function balanceQueryShouldSucceed (accountManager: AccountManager, cmd: 
       expect(accountManager._nodeClient).not.to.be.null
 
       const balance = await new AccountBalanceQuery()
-          .setAccountId(accountManager._nodeClient.getOperator().accountId)
-          .execute(accountManager._nodeClient)
+        .setAccountId(accountManager._nodeClient.getOperator().accountId)
+        .execute(accountManager._nodeClient)
 
       expect(balance.hbars).not.be.null
     } catch (e) {
@@ -349,9 +332,9 @@ export function accountCreationShouldSucceed (accountManager: AccountManager, no
       const amount = 100
 
       const newAccount = await new AccountCreateTransaction()
-          .setKey(privateKey)
-          .setInitialBalance(Hbar.from(amount, HbarUnit.Hbar))
-          .execute(accountManager._nodeClient)
+        .setKey(privateKey)
+        .setInitialBalance(Hbar.from(amount, HbarUnit.Hbar))
+        .execute(accountManager._nodeClient)
 
       // Get the new account ID
       const getReceipt = await newAccount.getReceipt(accountManager._nodeClient)
@@ -391,10 +374,10 @@ export async function getNodeAliasesPrivateKeysHash (networkNodeServicesMap: Map
 
 async function addKeyHashToMap (k8: K8, nodeAlias: NodeAlias, keyDir: string, uniqueNodeDestDir: string, keyHashMap: Map<string, string>, privateKeyFileName: string) {
   await k8.copyFrom(
-      Templates.renderNetworkPodName(nodeAlias),
-      ROOT_CONTAINER,
-      path.join(keyDir, privateKeyFileName),
-      uniqueNodeDestDir)
+    Templates.renderNetworkPodName(nodeAlias),
+    ROOT_CONTAINER,
+    path.join(keyDir, privateKeyFileName),
+    uniqueNodeDestDir)
   const keyBytes = fs.readFileSync(path.join(uniqueNodeDestDir, privateKeyFileName))
   const keyString = keyBytes.toString()
   keyHashMap.set(privateKeyFileName, crypto.createHash('sha256').update(keyString).digest('base64'))
