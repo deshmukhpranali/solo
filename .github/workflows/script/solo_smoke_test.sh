@@ -103,7 +103,7 @@ function start_background_transactions ()
   # generate accounts as background traffic for two minutes
   # so record stream files can be kept pushing to mirror node
   cd solo
-  npm run solo-test -- account create -n solo-e2e --create-amount 20 > /dev/null 2>&1 &
+  npm run solo-test -- account create -n solo-e2e --create-amount 15 > /dev/null 2>&1 &
   cd -
 }
 
@@ -188,4 +188,5 @@ start_background_transactions
 retry_contract_test
 retry_sdk_test
 echo "Sleep a while to wait background transactions to finish"
-sleep 20
+sleep 30
+
