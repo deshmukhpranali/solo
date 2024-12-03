@@ -90,10 +90,10 @@ function setup_smart_contract_test ()
 function background_keep_port_forward ()
 {
   for i in {1..25}; do
+    ps -ef |grep port-forward
     echo "Enable port forward round $i"
     enable_port_forward
     sleep 2
-    ps -ef |grep port-forward
   done &
 }
 
@@ -105,7 +105,6 @@ function start_background_transactions ()
   cd solo
   npm run solo-test -- account create -n solo-e2e --create-amount 20 > /dev/null 2>&1 &
   cd -
-  echo "end background transaction"
 }
 
 function start_contract_test ()
@@ -169,6 +168,12 @@ function start_sdk_test ()
   cd -
 }
 
+function retry_sdk_test ()
+{
+  function_name="start_sdk_test"
+  retry_function 5
+}
+
 echo "Change to parent directory"
 cd ../
 create_test_account
@@ -178,4 +183,6 @@ setup_smart_contract_test
 background_keep_port_forward
 start_background_transactions
 retry_contract_test
-start_sdk_test
+retry_sdk_test
+echo "Sleep a while to wait background transactions to finish"
+sleep 15
