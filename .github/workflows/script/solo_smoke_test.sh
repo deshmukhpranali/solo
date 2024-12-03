@@ -165,7 +165,10 @@ function start_sdk_test ()
 {
   cd solo
   node examples/create-topic.js
+  result=$?
+
   cd -
+  return $result
 }
 
 function retry_sdk_test ()
@@ -185,4 +188,4 @@ start_background_transactions
 retry_contract_test
 retry_sdk_test
 echo "Sleep a while to wait background transactions to finish"
-sleep 15
+sleep 20
