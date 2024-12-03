@@ -5,7 +5,7 @@ set -eo pipefail
 # This script should be called after solo has been deployed with mirror node and relay node deployed,
 # and should be called from the root of the solo repository
 #
-# This uses local node account creation function to repeatedly generate background transactions
+# This uses solo account creation function to repeatedly generate background transactions
 # Then run smart contract test, and also javascript sdk sample test to interact with solo network
 #
 
@@ -16,52 +16,7 @@ function enable_port_forward ()
   kubectl port-forward -n solo-e2e svc/haproxy-node1-svc 50211:50211 > /dev/null 2>&1 &
   kubectl port-forward -n solo-e2e svc/hedera-explorer 8080:80 > /dev/null 2>&1 &
   kubectl port-forward -n solo-e2e svc/relay-node1-hedera-json-rpc-relay 7546:7546 > /dev/null 2>&1 &
-}
-
-function create_test_account ()
-{
-  echo "Create test account with solo network"
-  cd solo
-
-  # create new account and extract account id
-  npm run solo-test -- account create -n solo-e2e --hbar-amount 100 --generate-ecdsa-key --set-alias > test.log
-  export OPERATOR_ID=$(grep "accountId" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
-  echo "OPERATOR_ID=${OPERATOR_ID}"
-  rm test.log
-
-  # get private key of the account
-  npm run solo-test -- account get -n solo-e2e --account-id ${OPERATOR_ID} --private-key > test.log
-  export OPERATOR_KEY=$(grep "privateKey" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
-  export CONTRACT_TEST_KEY_ONE=0x$(grep "privateKeyRaw" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
-  echo "CONTRACT_TEST_KEY_ONE=${CONTRACT_TEST_KEY_ONE}"
-  rm test.log
-
-  npm run solo-test -- account create -n solo-e2e --hbar-amount 100 --generate-ecdsa-key --set-alias > test.log
-  export SECOND_KEY=$(grep "accountId" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
-  npm run solo-test -- account get -n solo-e2e --account-id ${SECOND_KEY} --private-key > test.log
-  export CONTRACT_TEST_KEY_TWO=0x$(grep "privateKeyRaw" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
-  echo "CONTRACT_TEST_KEY_TWO=${CONTRACT_TEST_KEY_TWO}"
-  rm test.log
-
-  export CONTRACT_TEST_KEYS=${CONTRACT_TEST_KEY_ONE},$'\n'${CONTRACT_TEST_KEY_TWO}
-  export HEDERA_NETWORK="local-node"
-
-  echo "OPERATOR_KEY=${OPERATOR_KEY}"
-  echo "HEDERA_NETWORK=${HEDERA_NETWORK}"
-  echo "CONTRACT_TEST_KEYS=${CONTRACT_TEST_KEYS}"
-
-  cd -
-}
-
-function clone_smart_contract_repo ()
-{
-  echo "Clone hedera-smart-contracts"
-  if [ -d "hedera-smart-contracts" ]; then
-    echo "Directory hedera-smart-contracts exists."
-  else
-    echo "Directory hedera-smart-contracts does not exist."
-    git clone https://github.com/hashgraph/hedera-smart-contracts --branch only-erc20-tests
-  fi
+  kubectl port-forward -n solo-e2e svc/mirror-grpc 5600:5600 > /dev/null 2>&1 &
 }
 
 function clone_sdk_repo ()
@@ -78,6 +33,16 @@ function clone_sdk_repo ()
   fi
 }
 
+function clone_smart_contract_repo ()
+{
+  echo "Clone hedera-smart-contracts"
+  if [ -d "hedera-smart-contracts" ]; then
+    echo "Directory hedera-smart-contracts exists."
+  else
+    echo "Directory hedera-smart-contracts does not exist."
+    git clone https://github.com/hashgraph/hedera-smart-contracts --branch only-erc20-tests
+  fi
+}
 
 # retry the function saved in function_name for few times
 function retry_function ()
@@ -105,15 +70,13 @@ function retry_function ()
 function setup_smart_contract_test ()
 {
   echo "Setup smart contract test"
-#  CONTRACT_TEST_KEYS=$(cat hedera-local-node/private_key_without_quote_final.txt)
-
   cd hedera-smart-contracts
-
-  npm install
-  npx hardhat compile
 
   echo "Remove previous .env file"
   rm -f .env
+
+  npm install
+  npx hardhat compile
 
   echo "Build .env file"
 
@@ -126,7 +89,7 @@ function setup_smart_contract_test ()
 
 function background_keep_port_forward ()
 {
-  for i in {1..40}; do
+  for i in {1..25}; do
     echo "Enable port forward round $i"
     enable_port_forward
     sleep 2
@@ -164,6 +127,40 @@ function retry_contract_test ()
   retry_function 5
 }
 
+function create_test_account ()
+{
+  echo "Create test account with solo network"
+  cd solo
+
+  # create new account and extract account id
+  npm run solo-test -- account create -n solo-e2e --hbar-amount 100 --generate-ecdsa-key --set-alias > test.log
+  export OPERATOR_ID=$(grep "accountId" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
+  echo "OPERATOR_ID=${OPERATOR_ID}"
+  rm test.log
+
+  # get private key of the account
+  npm run solo-test -- account get -n solo-e2e --account-id ${OPERATOR_ID} --private-key > test.log
+  export OPERATOR_KEY=$(grep "privateKey" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
+  export CONTRACT_TEST_KEY_ONE=0x$(grep "privateKeyRaw" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
+  echo "CONTRACT_TEST_KEY_ONE=${CONTRACT_TEST_KEY_ONE}"
+  rm test.log
+
+  npm run solo-test -- account create -n solo-e2e --hbar-amount 100 --generate-ecdsa-key --set-alias > test.log
+  export SECOND_KEY=$(grep "accountId" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
+  npm run solo-test -- account get -n solo-e2e --account-id ${SECOND_KEY} --private-key > test.log
+  export CONTRACT_TEST_KEY_TWO=0x$(grep "privateKeyRaw" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
+  echo "CONTRACT_TEST_KEY_TWO=${CONTRACT_TEST_KEY_TWO}"
+  rm test.log
+
+  export CONTRACT_TEST_KEYS=${CONTRACT_TEST_KEY_ONE},$'\n'${CONTRACT_TEST_KEY_TWO}
+  export HEDERA_NETWORK="local-node"
+
+  echo "OPERATOR_KEY=${OPERATOR_KEY}"
+  echo "HEDERA_NETWORK=${HEDERA_NETWORK}"
+  echo "CONTRACT_TEST_KEYS=${CONTRACT_TEST_KEYS}"
+
+  cd -
+}
 
 function start_sdk_test ()
 {
