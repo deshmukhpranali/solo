@@ -18,47 +18,39 @@ function enable_port_forward ()
   kubectl port-forward -n solo-e2e svc/relay-node1-hedera-json-rpc-relay 7546:7546 > /dev/null 2>&1 &
 }
 
-# calling local node generate-accounts function and extract private key
-# from the output, after some manipulation, add the private key to hardhat.config.js
-function create_account_and_extract_key ()
+function create_test_account ()
 {
-  echo "Generate ECDSA keys, extract from output and save to key.txt"
-  # remove previous generate private key files
-  rm -rf "private_key*.txt"
-  npm run generate-accounts 3 > key.log
-  sed -n 's/.* - \(0x[0-9a-f]*\) - \(0x[0-9a-f]*\) - .*/\1 \2/p' key.log > key.txt
+  echo "Create test account with solo network"
+  cd solo
 
-  echo "Only keep the private key, the second column of each line of file key.txt"
-  awk '{print "\"" $2 "\","}' key.txt > private_key_with_quote.txt
-  awk '{print "" $2 ","}' key.txt > private_key_without_quote.txt
+  # create new account and extract account id
+  npm run solo-test -- account create -n solo-e2e --hbar-amount 100 --generate-ecdsa-key --set-alias > test.log
+  export OPERATOR_ID=$(grep "accountId" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
+  echo "OPERATOR_ID=${OPERATOR_ID}"
+  rm test.log
 
-  echo "Remove the comma of the last line before add to json file"
-  sed '$ s/.$//' private_key_with_quote.txt > private_key_with_quote_final.txt
-  sed '$ s/.$//' private_key_without_quote.txt > private_key_without_quote_final.txt
+  # get private key of the account
+  npm run solo-test -- account get -n solo-e2e --account-id ${OPERATOR_ID} --private-key > test.log
+  export OPERATOR_KEY=$(grep "privateKey" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
+  export CONTRACT_TEST_KEY_ONE=0x$(grep "privateKeyRaw" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
+  echo "CONTRACT_TEST_KEY_ONE=${CONTRACT_TEST_KEY_ONE}"
+  rm test.log
 
-  LOCAL_NODE_KEYS=$(cat private_key_with_quote_final.txt)
+  npm run solo-test -- account create -n solo-e2e --hbar-amount 100 --generate-ecdsa-key --set-alias > test.log
+  export SECOND_KEY=$(grep "accountId" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
+  npm run solo-test -- account get -n solo-e2e --account-id ${SECOND_KEY} --private-key > test.log
+  export CONTRACT_TEST_KEY_TWO=0x$(grep "privateKeyRaw" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
+  echo "CONTRACT_TEST_KEY_TWO=${CONTRACT_TEST_KEY_TWO}"
+  rm test.log
 
-  echo "Add new keys to hardhat.config.js"
-  git checkout test/smoke/hardhat.config.js
-  awk '/accounts: \[/ {print; getline; getline; next} 1' test/smoke/hardhat.config.js > test/smoke/hardhat.config.js.tmp
+  export CONTRACT_TEST_KEYS=${CONTRACT_TEST_KEY_ONE},$'\n'${CONTRACT_TEST_KEY_TWO}
+  export HEDERA_NETWORK="local-node"
 
-  if [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "$LOCAL_NODE_KEYS" > temp.txt
-    sed '/accounts: \[/r temp.txt'  test/smoke/hardhat.config.js.tmp  > test/smoke/hardhat.config.js
-    rm temp.txt
-  else
-    awk -v new_keys="$LOCAL_NODE_KEYS" '/accounts: \[/ {print; print new_keys; next} 1' test/smoke/hardhat.config.js.tmp > test/smoke/hardhat.config.js || true
-  fi
-  echo "Display the new hardhat.config.js"
-  cat test/smoke/hardhat.config.js
+  echo "OPERATOR_KEY=${OPERATOR_KEY}"
+  echo "HEDERA_NETWORK=${HEDERA_NETWORK}"
+  echo "CONTRACT_TEST_KEYS=${CONTRACT_TEST_KEYS}"
 
-  if [ -s "private_key_without_quote_final.txt" ]; then
-    echo "File private_key_without_quote_final.txt exists and not empty"
-    return 0
-  else
-    echo "File private_key_without_quote_final.txt does not exist or empty"
-    return 1
-  fi
+  cd -
 }
 
 function clone_smart_contract_repo ()
@@ -86,24 +78,6 @@ function clone_sdk_repo ()
   fi
 }
 
-# clone hedera local node repo and call function create_account_and_extract_key
-# to extract private keys
-function clone_local_node_repo ()
-{
-  echo "Clone hedera local node"
-  if [ -d "hedera-local-node" ]; then
-    echo "Directory hedera-local-node exists."
-  else
-    echo "Directory hedera-local-node does not exist."
-    git clone https://github.com/hashgraph/hedera-local-node --branch v2.32.0
-  fi
-  cd hedera-local-node
-  npm install
-
-  function_name=create_account_and_extract_key
-  retry_function 5
-  cd -
-}
 
 # retry the function saved in function_name for few times
 function retry_function ()
@@ -131,7 +105,7 @@ function retry_function ()
 function setup_smart_contract_test ()
 {
   echo "Setup smart contract test"
-  CONTRACT_TEST_KEYS=$(cat hedera-local-node/private_key_without_quote_final.txt)
+#  CONTRACT_TEST_KEYS=$(cat hedera-local-node/private_key_without_quote_final.txt)
 
   cd hedera-smart-contracts
 
@@ -166,7 +140,7 @@ function start_background_transactions ()
   # generate accounts as background traffic for two minutes
   # so record stream files can be kept pushing to mirror node
   cd solo
-  npm run solo-test -- account create -n solo-e2e --create-amount 18 > /dev/null 2>&1 &
+  npm run solo-test -- account create -n solo-e2e --create-amount 20 > /dev/null 2>&1 &
   cd -
   echo "end background transaction"
 }
@@ -190,29 +164,6 @@ function retry_contract_test ()
   retry_function 5
 }
 
-function create_test_account ()
-{
-  echo "Create test account with solo network"
-  cd solo
-
-  # create new account and extract account id
-  npm run solo-test -- account create -n solo-e2e --hbar-amount 100 > test.log
-  export OPERATOR_ID=$(grep "accountId" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
-  echo "OPERATOR_ID=${OPERATOR_ID}"
-
-  # get private key of the account
-  npm run solo-test -- account get -n solo-e2e --account-id ${OPERATOR_ID} --private-key > test.log
-  export OPERATOR_KEY=$(grep "privateKey" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
-
-  export HEDERA_NETWORK="local-node"
-
-  echo "OPERATOR_KEY=${OPERATOR_KEY}"
-  echo "HEDERA_NETWORK=${HEDERA_NETWORK}"
-
-  rm test.log
-  cd -
-}
-
 
 function start_sdk_test ()
 {
@@ -223,12 +174,11 @@ function start_sdk_test ()
 
 echo "Change to parent directory"
 cd ../
+create_test_account
 clone_sdk_repo
-background_keep_port_forward
-clone_local_node_repo
 clone_smart_contract_repo
 setup_smart_contract_test
-create_test_account
+background_keep_port_forward
 start_background_transactions
 retry_contract_test
 start_sdk_test
