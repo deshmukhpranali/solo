@@ -119,6 +119,9 @@ function retry_function ()
       echo "Function $function_name failed with return code $return_code"
     fi
     echo "Retry $function_name in 2 seconds"
+    echo "-----------------------"
+    cat retry.log
+    echo "-----------------------"
     sleep 2
   done
   echo "Function $function_name failed after 5 retries"
@@ -212,7 +215,7 @@ function create_test_account ()
 
 function start_sdk_test ()
 {
-  cd hedera-sdk-js
+  cd solo
   node examples/create-topic.js
   cd -
 }
