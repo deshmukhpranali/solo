@@ -154,7 +154,6 @@ function background_keep_port_forward ()
     enable_port_forward
     sleep 2
     ps -ef |grep port-forward
-    lsof -i -P -n | grep LISTEN |grep 30212
   done &
 }
 
@@ -195,6 +194,7 @@ function create_test_account ()
   # create new account and extract account id
   npm run solo-test -- account create -n solo-e2e --hbar-amount 100 > test.log
   export OPERATOR_ID=$(grep "accountId" test.log | awk '{print $2}' | sed 's/"//g'| sed 's/,//g')
+  echo "OPERATOR_ID=${OPERATOR_ID}"
 
   # get private key of the account
   npm run solo-test -- account get -n solo-e2e --account-id ${OPERATOR_ID} --private-key > test.log
@@ -202,7 +202,6 @@ function create_test_account ()
 
   export HEDERA_NETWORK="local-node"
 
-  echo "OPERATOR_ID=${OPERATOR_ID}"
   echo "OPERATOR_KEY=${OPERATOR_KEY}"
   echo "HEDERA_NETWORK=${HEDERA_NETWORK}"
 
