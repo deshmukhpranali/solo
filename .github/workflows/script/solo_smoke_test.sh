@@ -154,20 +154,17 @@ function background_keep_port_forward ()
     enable_port_forward
     sleep 2
     ps -ef |grep port-forward
+    lsof -i -P -n | grep LISTEN |grep 30212
   done &
 }
 
 function start_background_transactions ()
 {
   echo "Start background transaction"
-  # generate accounts every 3 seconds as background traffic for two minutes
+  # generate accounts as background traffic for two minutes
   # so record stream files can be kept pushing to mirror node
-  cd hedera-local-node
-  for i in {1..20}; do
-    echo "Running background transactions round $i"
-    npm run generate-accounts 3 > background.log 2>&1
-    sleep 1
-  done &
+  cd solo
+  npm run solo-test -- account create -n solo-e2e --create-amount 20 > /dev/null 2>&1 &
   cd -
 }
 
@@ -190,7 +187,7 @@ function retry_contract_test ()
   retry_function 5
 }
 
-function start_sdk_test ()
+function create_test_account ()
 {
   echo "Create test account with solo network"
   cd solo
@@ -210,8 +207,13 @@ function start_sdk_test ()
   echo "HEDERA_NETWORK=${HEDERA_NETWORK}"
 
   rm test.log
+  cd -
+}
 
-  cd ../hedera-sdk-js
+
+function start_sdk_test ()
+{
+  cd hedera-sdk-js
   node examples/create-topic.js
   cd -
 }
@@ -223,6 +225,7 @@ background_keep_port_forward
 clone_local_node_repo
 clone_smart_contract_repo
 setup_smart_contract_test
+create_test_account
 start_background_transactions
 retry_contract_test
 start_sdk_test
