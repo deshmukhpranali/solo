@@ -254,13 +254,14 @@ export function addDebugOptions(valuesArg: string, debugNodeAlias: NodeAlias, in
 export function addSaveContextParser(ctx: any) {
   const exportedCtx = {} as Record<string, string>;
 
-  const config = /** @type {NodeAddConfigClass} **/ ctx.config;
+  const config = ctx.config as NodeAddConfigClass;
   const exportedFields = ['tlsCertHash', 'upgradeZipHash', 'newNode'];
 
   exportedCtx.signingCertDer = ctx.signingCertDer.toString();
   exportedCtx.gossipEndpoints = ctx.gossipEndpoints.map((ep: any) => `${ep.getDomainName}:${ep.getPort}`);
   exportedCtx.grpcServiceEndpoints = ctx.grpcServiceEndpoints.map((ep: any) => `${ep.getDomainName}:${ep.getPort}`);
   exportedCtx.adminKey = ctx.adminKey.toString();
+  // @ts-ignore
   exportedCtx.existingNodeAliases = config.existingNodeAliases;
 
   for (const prop of exportedFields) {

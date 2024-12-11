@@ -18,7 +18,7 @@ import type * as x509 from '@peculiar/x509';
 import type net from 'net';
 import type * as WebSocket from 'ws';
 import type crypto from 'crypto';
-import type {ListrTask} from 'listr2';
+import type {ListrTask, ListrTaskWrapper} from 'listr2';
 
 // NOTE: DO NOT add any Solo imports in this file to avoid circular dependencies
 
@@ -80,3 +80,56 @@ export interface ToObject<T> {
 export type SoloListrTask<T> = ListrTask<T, any, any>;
 
 export type EmptyContextConfig = object;
+
+export type SoloListrTaskWrapper<T> = ListrTaskWrapper<T, any, any>
+
+// export interface NodeMetadata {
+//   rosterEntry: RosterEntry
+//   node: Node
+//   tssEncryptionKey: string
+// }
+
+// export interface RosterEntry {
+//   nodeId: number
+//   weight: number
+//   gossipCaCertificate: string
+//   gossipEndpoint: Array<ServiceEndpoint>
+// }
+
+export interface ServiceEndpoint {
+  ipAddressV4: string
+  port: number
+  domainName: string
+}
+
+// basically what node update does
+//
+// export interface Node {
+//   nodeId number                                    ✅
+//   AccountID accountId                              ✅
+//   description string                               ✅
+//   gossipEndpoint Array<ServiceEndpoint>
+//        all of this are in single network, single cluster,
+//        is going to be fully qualified domain name for
+//        what we are currently putting as external ( ha proxy endpoint )
+//   serviceEndpoint: Array<ServiceEndpoint>
+//   gossipCaCertificate: Bytes - node keys           ✅
+//   grpcCertificateHash: Bytes - kode in node command how to generate it
+//   weight: number,
+//   deleted: boolean,                                ✅
+//   adminKey: Key                                    ✅
+//        right now dynamically
+//        generate it but add it as a secret as
+//        all other ledger uhh account keys
+//
+//   generate it the same way without genesis, a unique one and store it as a secret, we want to name it a bit differently
+// }
+
+// gleda configureNodeAccess
+
+// internal is the network pod name
+// external ip is the network service name
+// the gossip endpoint is externalIP
+
+// the service endpoint - for the grpc calls, configureNodeAccess
+

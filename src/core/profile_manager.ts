@@ -31,6 +31,7 @@ import * as helpers from './helpers.js';
 import {getNodeAccountMap} from './helpers.js';
 import type {SoloLogger} from './logging.js';
 import type {NodeAlias, NodeAliases} from '../types/aliases.js';
+import {GenesisNetworkDataConstructor} from './models/genesisNetworkDataConstructor.js';
 
 const consensusSidecars = [
   'recordStreamUploader',
@@ -100,10 +101,10 @@ export class ProfileManager {
   }
 
   /**
-   * Set value in the yaml object
+   * Set value in the YAML object
    * @param itemPath - item path in the yaml
    * @param value - value to be set
-   * @param yamlRoot - root of the yaml object
+   * @param yamlRoot - root of the YAML object
    * @returns
    */
   _setValue(itemPath: string, value: any, yamlRoot: object): object {
@@ -309,14 +310,14 @@ export class ProfileManager {
     const nodeAliases = helpers.parseNodeAliases(this.configManager.getFlag(flags.nodeAliasesUnparsed));
     if (!nodeAliases) throw new SoloError('Node IDs are not set in the config');
 
-    // generate the yaml
+    // generate the YAML
     const yamlRoot = {};
     this.resourcesForConsensusPod(profile, nodeAliases, yamlRoot);
     this.resourcesForHaProxyPod(profile, yamlRoot);
     this.resourcesForEnvoyProxyPod(profile, yamlRoot);
     this.resourcesForMinioTenantPod(profile, yamlRoot);
 
-    // write the yaml
+    // write the YAML
     const cachedValuesFile = path.join(this.cacheDir, `solo-${profileName}.yaml`);
     return new Promise<string>((resolve, reject) => {
       fs.writeFile(cachedValuesFile, yaml.stringify(yamlRoot), err => {
@@ -372,11 +373,11 @@ export class ProfileManager {
     const profile = this.getProfile(profileName) as any;
     if (!profile.rpcRelay) return Promise.resolve(); // use chart defaults
 
-    // generate the yaml
+    // generate the YAML
     const yamlRoot = {};
     this._setChartItems('', profile.rpcRelay, yamlRoot);
 
-    // write the yaml
+    // write the YAML
     const cachedValuesFile = path.join(this.cacheDir, `rpcRelay-${profileName}.yaml`);
     return new Promise<string>((resolve, reject) => {
       fs.writeFile(cachedValuesFile, yaml.stringify(yamlRoot), err => {
@@ -392,11 +393,11 @@ export class ProfileManager {
   prepareValuesHederaExplorerChart(profileName: string) {
     if (!profileName) throw new MissingArgumentError('profileName is required');
     const profile = this.getProfile(profileName) as any;
-    // generate the yaml
+    // generate the YAML
     const yamlRoot = {};
     this.resourcesForHederaExplorerPod(profile, yamlRoot);
 
-    // write the yaml
+    // write the YAML
     const cachedValuesFile = path.join(this.cacheDir, `explorer-${profileName}.yaml`);
     return new Promise<string>((resolve, reject) => {
       fs.writeFile(cachedValuesFile, yaml.stringify(yamlRoot), err => {
@@ -412,14 +413,14 @@ export class ProfileManager {
   /**
    * Prepare a values file for mirror-node Helm chart
    * @param profileName - resource profile name
-   * @returns return the full path to the values file
+   * @returns the full path to the values file
    */
   prepareValuesForMirrorNodeChart(profileName: string) {
     if (!profileName) throw new MissingArgumentError('profileName is required');
     const profile = this.getProfile(profileName) as any;
     if (!profile.mirror) return Promise.resolve(); // use chart defaults
 
-    // generate the yaml
+    // generate the YAML
     const yamlRoot = {};
     if (profile.mirror.postgresql) {
       if (profile.mirror.postgresql.persistence) {
@@ -435,7 +436,7 @@ export class ProfileManager {
     this._setChartItems('grpc', profile.mirror.grpc, yamlRoot);
     this._setChartItems('monitor', profile.mirror.monitor, yamlRoot);
 
-    // write the yaml
+    // write the YAML
     const cachedValuesFile = path.join(this.cacheDir, `mirror-${profileName}.yaml`);
     return new Promise<string>((resolve, reject) => {
       fs.writeFile(cachedValuesFile, yaml.stringify(yamlRoot), err => {
@@ -467,6 +468,7 @@ export class ProfileManager {
    * @param releaseTag - release tag e.g. v0.42.0
    * @param [appName] - the app name (default: HederaNode.jar)
    * @param [chainId] - chain ID (298 for local network)
+   * @param genesisNetworkData
    * @returns the config.txt file path
    */
   prepareConfigTxt(
@@ -476,6 +478,7 @@ export class ProfileManager {
     releaseTag: string,
     appName = constants.HEDERA_APP_NAME,
     chainId = constants.HEDERA_CHAIN_ID,
+    genesisNetworkData: GenesisNetworkDataConstructor
   ) {
     if (!nodeAccountMap || nodeAccountMap.size === 0)
       throw new MissingArgumentError('nodeAccountMap the map of node IDs to account IDs is required');
@@ -501,6 +504,9 @@ export class ProfileManager {
       for (const nodeAlias of nodeAccountMap.keys()) {
         const internalIP = Templates.renderFullyQualifiedNetworkPodName(namespace, nodeAlias);
         const externalIP = Templates.renderFullyQualifiedNetworkSvcName(namespace, nodeAlias);
+
+        genesisNetworkData.nodes[nodeAlias].addGossipEndpoint(externalIP, +externalPort, '');
+        genesisNetworkData.nodes[nodeAlias].addServiceEndpoint(internalIP, +internalPort, '');
 
         const account = nodeAccountMap.get(nodeAlias);
         if (releaseVersion.minor >= 40) {

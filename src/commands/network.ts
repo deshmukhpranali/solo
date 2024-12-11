@@ -61,6 +61,7 @@ export interface NetworkDeployConfigClass {
   grpcWebTlsCertificatePath: string;
   grpcTlsKeyPath: string;
   grpcWebTlsKeyPath: string;
+  genesisNetworkJson: string;
   getUnusedConfigs: () => string[];
   haproxyIps: string;
   envoyIps: string;
@@ -140,6 +141,7 @@ export class NetworkCommand extends BaseCommand {
       releaseTag?: string;
       persistentVolumeClaims?: string;
       valuesFile?: string;
+      genesisNetworkJson?: string;
       haproxyIpsParsed?: Record<NodeAlias, IP>;
       envoyIpsParsed?: Record<NodeAlias, IP>;
     } = {},
@@ -196,6 +198,8 @@ export class NetworkCommand extends BaseCommand {
     if (config.valuesFile) {
       valuesArg += this.prepareValuesFiles(config.valuesFile);
     }
+
+    valuesArg += `--set "hedera.configMaps.genesisNetworkJson=${config.genesisNetworkJson}"`
 
     this.logger.debug('Prepared helm chart values', {valuesArg});
     return valuesArg;
@@ -256,6 +260,8 @@ export class NetworkCommand extends BaseCommand {
       constants.SOLO_TESTING_CHART,
       constants.SOLO_DEPLOYMENT_CHART,
     );
+
+    config.genesisNetworkJson = this.prepareGenesisNetworkJson(config)
 
     config.valuesArg = await this.prepareValuesArg(config);
 
@@ -390,7 +396,7 @@ export class NetworkCommand extends BaseCommand {
           task: (ctx, parentTask) => {
             const config = ctx.config;
 
-            // set up the sub-tasks
+            // set up the subtasks
             return parentTask.newListr(self.platformInstaller.copyNodeKeys(config.stagingDir, config.nodeAliases), {
               concurrent: true,
               rendererOptions: constants.LISTR_DEFAULT_RENDERER_OPTION,
@@ -506,7 +512,7 @@ export class NetworkCommand extends BaseCommand {
                 ),
             });
 
-            // set up the sub-tasks
+            // set up the subtasks
             return task.newListr(subTasks, {
               concurrent: false, // no need to run concurrently since if one node is up, the rest should be up by then
               rendererOptions: {
@@ -673,6 +679,14 @@ export class NetworkCommand extends BaseCommand {
     }
 
     return true;
+  }
+
+  prepareGenesisNetworkJson(config: NetworkDeployConfigClass): string {
+    const data = {network: {nodes: []}}
+
+    // TODO
+
+    return JSON.stringify(data);
   }
 
   getCommandDefinition(): {command: string; desc: string; builder: CommandBuilder} {
