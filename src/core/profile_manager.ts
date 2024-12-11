@@ -108,7 +108,7 @@ export class ProfileManager {
    * @returns
    */
   _setValue(itemPath: string, value: any, yamlRoot: object): object {
-    // find the location where to set the value in the yaml
+    // find the location where to set the value in the YAML
     const itemPathParts: string[] = itemPath.split('.');
     let parent = yamlRoot;
     let current = parent;
