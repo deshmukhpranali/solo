@@ -171,7 +171,7 @@ export class ProfileManager {
     }
   }
 
-  resourcesForConsensusPod(profile: any, nodeAliases: NodeAliases, yamlRoot: object): object {
+  resourcesForConsensusPod(profile: any, nodeAliases: NodeAliases, yamlRoot: object, genesisNetworkData: GenesisNetworkDataConstructor): object {
     if (!profile) throw new MissingArgumentError('profile is required');
 
     const accountMap = getNodeAccountMap(nodeAliases);
@@ -198,6 +198,7 @@ export class ProfileManager {
       this.configManager.getFlag(flags.releaseTag),
       this.configManager.getFlag(flags.app),
       this.configManager.getFlag(flags.chainId),
+      genesisNetworkData
     );
 
     for (const flag of flags.nodeConfigFileFlags.values()) {
@@ -301,9 +302,10 @@ export class ProfileManager {
   /**
    * Prepare a values file for Solo Helm chart
    * @param profileName resource profile name
+   * @param genesisNetworkData
    * @returns return the full path to the values file
    */
-  prepareValuesForSoloChart(profileName: string) {
+  prepareValuesForSoloChart(profileName: string, genesisNetworkData: GenesisNetworkDataConstructor) {
     if (!profileName) throw new MissingArgumentError('profileName is required');
     const profile = this.getProfile(profileName);
 
@@ -312,7 +314,7 @@ export class ProfileManager {
 
     // generate the YAML
     const yamlRoot = {};
-    this.resourcesForConsensusPod(profile, nodeAliases, yamlRoot);
+    this.resourcesForConsensusPod(profile, nodeAliases, yamlRoot, genesisNetworkData);
     this.resourcesForHaProxyPod(profile, yamlRoot);
     this.resourcesForEnvoyProxyPod(profile, yamlRoot);
     this.resourcesForMinioTenantPod(profile, yamlRoot);

@@ -38,6 +38,7 @@ import {ConsensusNodeComponent} from '../core/config/remote/components/consensus
 import {ConsensusNodeStates} from '../core/config/remote/enumerations.js';
 import {EnvoyProxyComponent} from '../core/config/remote/components/envoy_proxy_component.js';
 import {HaProxyComponent} from '../core/config/remote/components/ha_proxy_component.js';
+import {GenesisNetworkDataConstructor} from '../core/models/genesisNetworkDataConstructor.js';
 
 export interface NetworkDeployConfigClass {
   applicationEnv: string;
@@ -61,7 +62,7 @@ export interface NetworkDeployConfigClass {
   grpcWebTlsCertificatePath: string;
   grpcTlsKeyPath: string;
   grpcWebTlsKeyPath: string;
-  genesisNetworkJson: string;
+  genesisNetworkData: GenesisNetworkDataConstructor;
   getUnusedConfigs: () => string[];
   haproxyIps: string;
   envoyIps: string;
@@ -135,7 +136,7 @@ export class NetworkCommand extends BaseCommand {
     config: {
       chartDirectory?: string;
       app?: string;
-      nodeAliases?: string[];
+      nodeAliases: string[];
       debugNodeAlias?: NodeAlias;
       enablePrometheusSvcMonitor?: boolean;
       releaseTag?: string;
@@ -143,8 +144,8 @@ export class NetworkCommand extends BaseCommand {
       valuesFile?: string;
       haproxyIpsParsed?: Record<NodeAlias, IP>;
       envoyIpsParsed?: Record<NodeAlias, IP>;
-      genesisNetworkJson?: string;
-    } = {},
+      genesisNetworkData: GenesisNetworkDataConstructor;
+    }
   ) {
     let valuesArg = config.chartDirectory
       ? `-f ${path.join(config.chartDirectory, 'solo-deployment', 'values.yaml')}`
@@ -162,7 +163,7 @@ export class NetworkCommand extends BaseCommand {
     }
 
     const profileName = this.configManager.getFlag<string>(flags.profileName) as string;
-    this.profileValuesFile = await this.profileManager.prepareValuesForSoloChart(profileName);
+    this.profileValuesFile = await this.profileManager.prepareValuesForSoloChart(profileName, config.genesisNetworkData);
     if (this.profileValuesFile) {
       valuesArg += this.prepareValuesFiles(this.profileValuesFile);
     }
@@ -179,7 +180,7 @@ export class NetworkCommand extends BaseCommand {
 
     // Iterate over each node and set static IPs for HAProxy
     if (config.haproxyIpsParsed) {
-      config.nodeAliases?.forEach((nodeAlias, index) => {
+      config.nodeAliases.forEach((nodeAlias, index) => {
         const ip = config.haproxyIpsParsed?.[nodeAlias];
 
         if (ip) valuesArg += ` --set "hedera.nodes[${index}].haproxyStaticIP=${ip}"`;
@@ -188,7 +189,7 @@ export class NetworkCommand extends BaseCommand {
 
     // Iterate over each node and set static IPs for Envoy Proxy
     if (config.envoyIpsParsed) {
-      config.nodeAliases?.forEach((nodeAlias, index) => {
+      config.nodeAliases.forEach((nodeAlias, index) => {
         const ip = config.envoyIpsParsed?.[nodeAlias];
 
         if (ip) valuesArg += ` --set "hedera.nodes[${index}].envoyProxyStaticIP=${ip}"`;
@@ -199,7 +200,7 @@ export class NetworkCommand extends BaseCommand {
       valuesArg += this.prepareValuesFiles(config.valuesFile);
     }
 
-    valuesArg += `--set "hedera.configMaps.genesisNetworkJson=${config.genesisNetworkJson}"`
+    valuesArg += `--set "hedera.configMaps.genesisNetworkJson=${config.genesisNetworkData.toJSON()}"`
 
     this.logger.debug('Prepared helm chart values', {valuesArg});
     return valuesArg;
@@ -261,7 +262,7 @@ export class NetworkCommand extends BaseCommand {
       constants.SOLO_DEPLOYMENT_CHART,
     );
 
-    config.genesisNetworkJson = this.prepareGenesisNetworkJson(config)
+    config.genesisNetworkData = new GenesisNetworkDataConstructor(config.nodeAliases);
 
     config.valuesArg = await this.prepareValuesArg(config);
 

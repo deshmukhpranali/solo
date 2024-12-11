@@ -21,12 +21,12 @@ import {KeyManager} from '../key_manager.js';
 
 import crypto from 'node:crypto';
 import {PrivateKey} from '@hashgraph/sdk';
-import {constants} from '../index.js';
+import * as constants from '../constants.js';
 
 export class GenesisNetworkDataConstructor {
   public readonly nodes: Record<NodeAlias, GenesisNetworkNodeDataWrapper>;
 
-  constructor (public readonly nodeAliases: NodeAliases) {
+  public constructor (public readonly nodeAliases: NodeAliases) {
     this.nodeAliases.forEach(nodeAlias => {
       this.nodes[nodeAlias] = new GenesisNetworkNodeDataWrapper(Templates.nodeIdFromNodeAlias(nodeAlias))
 
@@ -39,7 +39,7 @@ export class GenesisNetworkDataConstructor {
    * @param keyManager
    * @param keysDir - !!! config.keysDir !!!
    */
-  async load (keyManager: KeyManager, keysDir: string) {
+  public async load (keyManager: KeyManager, keysDir: string) {
     await Promise.all(this.nodeAliases.map(async nodeAlias => {
       const nodeKeys = await keyManager.loadSigningKey(nodeAlias, keysDir);
 
@@ -53,5 +53,9 @@ export class GenesisNetworkDataConstructor {
       this.nodes[nodeAlias].gossipCaCertificate = certificate;
       this.nodes[nodeAlias].grpcCertificateHash = hash;
     }))
+  }
+
+  public toJSON (): string {
+    return JSON.stringify(this.nodes);
   }
 }
