@@ -141,9 +141,9 @@ export class NetworkCommand extends BaseCommand {
       releaseTag?: string;
       persistentVolumeClaims?: string;
       valuesFile?: string;
-      genesisNetworkJson?: string;
       haproxyIpsParsed?: Record<NodeAlias, IP>;
       envoyIpsParsed?: Record<NodeAlias, IP>;
+      genesisNetworkJson?: string;
     } = {},
   ) {
     let valuesArg = config.chartDirectory

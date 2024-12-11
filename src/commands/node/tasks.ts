@@ -457,6 +457,7 @@ export class NodeCommandTasks {
    */
   _generateGossipKeys(generateMultiple: boolean) {
     const self = this;
+
     return new Task(
       'Generate gossip keys',
       (ctx: any, task: ListrTaskWrapper<any, any, any>) => {
