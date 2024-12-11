@@ -33,7 +33,7 @@ interface Node {
 
 export class GenesisNetworkNodeDataWrapper implements Node{
   public readonly nodeId: number;
-  public readonly accountId: AccountId | string;
+  public accountId: AccountId | string;
   public readonly description: string;
   public gossipEndpoint: ServiceEndpoint;
   public serviceEndpoint: ServiceEndpoint;

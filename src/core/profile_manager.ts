@@ -507,10 +507,14 @@ export class ProfileManager {
         const internalIP = Templates.renderFullyQualifiedNetworkPodName(namespace, nodeAlias);
         const externalIP = Templates.renderFullyQualifiedNetworkSvcName(namespace, nodeAlias);
 
-        genesisNetworkData.nodes[nodeAlias].addGossipEndpoint(externalIP, +externalPort, '');
-        genesisNetworkData.nodes[nodeAlias].addServiceEndpoint(internalIP, +internalPort, '');
+        const nodeDataWrapper = genesisNetworkData.nodes[nodeAlias];
+        nodeDataWrapper.addGossipEndpoint(externalIP, +externalPort, '');
+        nodeDataWrapper.addServiceEndpoint(internalIP, +internalPort, '');
 
         const account = nodeAccountMap.get(nodeAlias);
+
+        nodeDataWrapper.accountId = account
+
         if (releaseVersion.minor >= 40) {
           configLines.push(
             `address, ${nodeSeq}, ${nodeSeq}, ${nodeAlias}, ${nodeStakeAmount}, ${internalIP}, ${internalPort}, ${externalIP}, ${externalPort}, ${account}`,

@@ -22,6 +22,7 @@ import {KeyManager} from '../key_manager.js';
 import crypto from 'node:crypto';
 import {PrivateKey} from '@hashgraph/sdk';
 import * as constants from '../constants.js';
+import * as x509 from '@peculiar/x509';
 
 export class GenesisNetworkDataConstructor {
   public readonly nodes: Record<NodeAlias, GenesisNetworkNodeDataWrapper>;
@@ -43,15 +44,16 @@ export class GenesisNetworkDataConstructor {
     await Promise.all(this.nodeAliases.map(async nodeAlias => {
       const nodeKeys = await keyManager.loadSigningKey(nodeAlias, keysDir);
 
-      this.nodes[nodeAlias].gossipCaCertificate = nodeKeys.certificate.toString()
 
-      const certificate = nodeKeys.certificate.toString();
+      const certPem = nodeKeys.certificate.toString()
 
-      // TODO: change parameters
-      const hash = crypto.createHash('sha256').update(certificate).digest('hex');
+      this.nodes[nodeAlias].gossipCaCertificate = certPem
 
-      this.nodes[nodeAlias].gossipCaCertificate = certificate;
-      this.nodes[nodeAlias].grpcCertificateHash = hash;
+      const tlsCertDer = new Uint8Array(x509.PemConverter.decode(certPem)[0]);
+
+      const grpcCertificateHash = crypto.createHash('sha384').update(tlsCertDer).digest();
+
+      this.nodes[nodeAlias].grpcCertificateHash = grpcCertificateHash.toString();
     }))
   }
 
