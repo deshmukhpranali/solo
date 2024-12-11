@@ -83,19 +83,6 @@ export type EmptyContextConfig = object;
 
 export type SoloListrTaskWrapper<T> = ListrTaskWrapper<T, any, any>
 
-// export interface NodeMetadata {
-//   rosterEntry: RosterEntry
-//   node: Node
-//   tssEncryptionKey: string
-// }
-
-// export interface RosterEntry {
-//   nodeId: number
-//   weight: number
-//   gossipCaCertificate: string
-//   gossipEndpoint: Array<ServiceEndpoint>
-// }
-
 export interface ServiceEndpoint {
   ipAddressV4: string
   port: number
