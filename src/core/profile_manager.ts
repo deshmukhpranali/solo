@@ -175,7 +175,7 @@ export class ProfileManager {
     profile: any,
     nodeAliases: NodeAliases,
     yamlRoot: object,
-    genesisNetworkData: GenesisNetworkDataConstructor,
+    genesisNetworkData?: GenesisNetworkDataConstructor,
   ): object {
     if (!profile) throw new MissingArgumentError('profile is required');
 
@@ -310,7 +310,7 @@ export class ProfileManager {
    * @param genesisNetworkData
    * @returns return the full path to the values file
    */
-  prepareValuesForSoloChart(profileName: string, genesisNetworkData: GenesisNetworkDataConstructor) {
+  prepareValuesForSoloChart(profileName: string, genesisNetworkData?: GenesisNetworkDataConstructor) {
     if (!profileName) throw new MissingArgumentError('profileName is required');
     const profile = this.getProfile(profileName);
 
@@ -485,7 +485,7 @@ export class ProfileManager {
     releaseTag: string,
     appName = constants.HEDERA_APP_NAME,
     chainId = constants.HEDERA_CHAIN_ID,
-    genesisNetworkData: GenesisNetworkDataConstructor,
+    genesisNetworkData?: GenesisNetworkDataConstructor,
   ) {
     if (!nodeAccountMap || nodeAccountMap.size === 0)
       throw new MissingArgumentError('nodeAccountMap the map of node IDs to account IDs is required');
@@ -511,21 +511,21 @@ export class ProfileManager {
       for (const nodeAlias of nodeAccountMap.keys()) {
         const internalIP = Templates.renderFullyQualifiedNetworkPodName(namespace, nodeAlias);
         const externalIP = Templates.renderFullyQualifiedNetworkSvcName(namespace, nodeAlias);
-
-        const nodeDataWrapper = genesisNetworkData.nodes[nodeAlias];
-
-        nodeDataWrapper.weight = nodeStakeAmount;
-
-        // Add gossip endpoints
-        nodeDataWrapper.addGossipEndpoint(externalIP, externalPort);
-        nodeDataWrapper.addGossipEndpoint(internalIP, internalPort);
-
-        // Add service endpoints
-        nodeDataWrapper.addServiceEndpoint(internalIP, internalPort);
-
         const account = nodeAccountMap.get(nodeAlias);
 
-        nodeDataWrapper.accountId = account;
+        if (genesisNetworkData) {
+          const nodeDataWrapper = genesisNetworkData.nodes[nodeAlias];
+
+          nodeDataWrapper.weight = nodeStakeAmount;
+          nodeDataWrapper.accountId = account;
+
+          // Add gossip endpoints
+          nodeDataWrapper.addGossipEndpoint(externalIP, externalPort);
+          nodeDataWrapper.addGossipEndpoint(internalIP, internalPort);
+
+          // Add service endpoints
+          nodeDataWrapper.addServiceEndpoint(internalIP, internalPort);
+        }
 
         if (releaseVersion.minor >= 40) {
           configLines.push(
