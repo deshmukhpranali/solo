@@ -132,21 +132,19 @@ export class NetworkCommand extends BaseCommand {
     ];
   }
 
-  async prepareValuesArg(
-    config: {
-      chartDirectory?: string;
-      app?: string;
-      nodeAliases: string[];
-      debugNodeAlias?: NodeAlias;
-      enablePrometheusSvcMonitor?: boolean;
-      releaseTag?: string;
-      persistentVolumeClaims?: string;
-      valuesFile?: string;
-      haproxyIpsParsed?: Record<NodeAlias, IP>;
-      envoyIpsParsed?: Record<NodeAlias, IP>;
-      genesisNetworkData: GenesisNetworkDataConstructor;
-    }
-  ) {
+  async prepareValuesArg(config: {
+    chartDirectory?: string;
+    app?: string;
+    nodeAliases: string[];
+    debugNodeAlias?: NodeAlias;
+    enablePrometheusSvcMonitor?: boolean;
+    releaseTag?: string;
+    persistentVolumeClaims?: string;
+    valuesFile?: string;
+    haproxyIpsParsed?: Record<NodeAlias, IP>;
+    envoyIpsParsed?: Record<NodeAlias, IP>;
+    genesisNetworkData: GenesisNetworkDataConstructor;
+  }) {
     let valuesArg = config.chartDirectory
       ? `-f ${path.join(config.chartDirectory, 'solo-deployment', 'values.yaml')}`
       : '';
@@ -163,7 +161,10 @@ export class NetworkCommand extends BaseCommand {
     }
 
     const profileName = this.configManager.getFlag<string>(flags.profileName) as string;
-    this.profileValuesFile = await this.profileManager.prepareValuesForSoloChart(profileName, config.genesisNetworkData);
+    this.profileValuesFile = await this.profileManager.prepareValuesForSoloChart(
+      profileName,
+      config.genesisNetworkData,
+    );
     if (this.profileValuesFile) {
       valuesArg += this.prepareValuesFiles(this.profileValuesFile);
     }
@@ -200,7 +201,7 @@ export class NetworkCommand extends BaseCommand {
       valuesArg += this.prepareValuesFiles(config.valuesFile);
     }
 
-    valuesArg += `--set "hedera.configMaps.genesisNetworkJson=${config.genesisNetworkData.toJSON()}"`
+    valuesArg += `--set "hedera.configMaps.genesisNetworkJson=${config.genesisNetworkData.toJSON()}"`;
 
     this.logger.debug('Prepared helm chart values', {valuesArg});
     return valuesArg;
@@ -262,7 +263,7 @@ export class NetworkCommand extends BaseCommand {
       constants.SOLO_DEPLOYMENT_CHART,
     );
 
-    config.genesisNetworkData = new GenesisNetworkDataConstructor(config.nodeAliases);
+    config.genesisNetworkData = new GenesisNetworkDataConstructor(config.nodeAliases, this.keyManager, config.keysDir);
 
     config.valuesArg = await this.prepareValuesArg(config);
 
@@ -683,7 +684,7 @@ export class NetworkCommand extends BaseCommand {
   }
 
   prepareGenesisNetworkJson(config: NetworkDeployConfigClass): string {
-    const data = {network: {nodes: []}}
+    const data = {network: {nodes: []}};
 
     // TODO
 

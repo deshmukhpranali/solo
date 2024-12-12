@@ -28,10 +28,10 @@ import {Templates} from './templates.js';
 import * as constants from './constants.js';
 import {type ConfigManager} from './config_manager.js';
 import * as helpers from './helpers.js';
-import {getNodeAccountMap} from './helpers.js';
+import {getNodeAccountMap, parseIpAddressToUint8Array} from './helpers.js';
 import type {SoloLogger} from './logging.js';
 import type {NodeAlias, NodeAliases} from '../types/aliases.js';
-import {GenesisNetworkDataConstructor} from './models/genesisNetworkDataConstructor.js';
+import {type GenesisNetworkDataConstructor} from './models/genesisNetworkDataConstructor.js';
 
 const consensusSidecars = [
   'recordStreamUploader',
@@ -171,7 +171,12 @@ export class ProfileManager {
     }
   }
 
-  resourcesForConsensusPod(profile: any, nodeAliases: NodeAliases, yamlRoot: object, genesisNetworkData: GenesisNetworkDataConstructor): object {
+  resourcesForConsensusPod(
+    profile: any,
+    nodeAliases: NodeAliases,
+    yamlRoot: object,
+    genesisNetworkData: GenesisNetworkDataConstructor,
+  ): object {
     if (!profile) throw new MissingArgumentError('profile is required');
 
     const accountMap = getNodeAccountMap(nodeAliases);
@@ -198,7 +203,7 @@ export class ProfileManager {
       this.configManager.getFlag(flags.releaseTag),
       this.configManager.getFlag(flags.app),
       this.configManager.getFlag(flags.chainId),
-      genesisNetworkData
+      genesisNetworkData,
     );
 
     for (const flag of flags.nodeConfigFileFlags.values()) {
@@ -480,7 +485,7 @@ export class ProfileManager {
     releaseTag: string,
     appName = constants.HEDERA_APP_NAME,
     chainId = constants.HEDERA_CHAIN_ID,
-    genesisNetworkData: GenesisNetworkDataConstructor
+    genesisNetworkData: GenesisNetworkDataConstructor,
   ) {
     if (!nodeAccountMap || nodeAccountMap.size === 0)
       throw new MissingArgumentError('nodeAccountMap the map of node IDs to account IDs is required');
@@ -490,8 +495,8 @@ export class ProfileManager {
       throw new IllegalArgumentError(`config destPath does not exist: ${destPath}`, destPath);
 
     // init variables
-    const internalPort = constants.HEDERA_NODE_INTERNAL_GOSSIP_PORT;
-    const externalPort = constants.HEDERA_NODE_EXTERNAL_GOSSIP_PORT;
+    const internalPort = +constants.HEDERA_NODE_INTERNAL_GOSSIP_PORT;
+    const externalPort = +constants.HEDERA_NODE_EXTERNAL_GOSSIP_PORT;
     const nodeStakeAmount = constants.HEDERA_NODE_DEFAULT_STAKE_AMOUNT;
 
     // @ts-ignore
@@ -508,12 +513,19 @@ export class ProfileManager {
         const externalIP = Templates.renderFullyQualifiedNetworkSvcName(namespace, nodeAlias);
 
         const nodeDataWrapper = genesisNetworkData.nodes[nodeAlias];
-        nodeDataWrapper.addGossipEndpoint(externalIP, +externalPort, '');
-        nodeDataWrapper.addServiceEndpoint(internalIP, +internalPort, '');
+
+        nodeDataWrapper.weight = nodeStakeAmount;
+
+        // Add gossip endpoints
+        nodeDataWrapper.addGossipEndpoint(externalIP, externalPort);
+        nodeDataWrapper.addGossipEndpoint(internalIP, internalPort);
+
+        // Add service endpoints
+        nodeDataWrapper.addServiceEndpoint(internalIP, internalPort);
 
         const account = nodeAccountMap.get(nodeAlias);
 
-        nodeDataWrapper.accountId = account
+        nodeDataWrapper.accountId = account;
 
         if (releaseVersion.minor >= 40) {
           configLines.push(

@@ -14,50 +14,61 @@
  * limitations under the License.
  *
  */
-import type {NodeAlias, NodeAliases} from '../../types/aliases.js';
-import {GenesisNetworkNodeDataWrapper} from './genesisNetworkNodeDataWrapper.js';
-import {Templates} from '../templates.js';
-import {KeyManager} from '../key_manager.js';
-
 import crypto from 'node:crypto';
 import {PrivateKey} from '@hashgraph/sdk';
-import * as constants from '../constants.js';
+import {Templates} from '../templates.js';
+import {GenesisNetworkNodeDataWrapper} from './genesisNetworkNodeDataWrapper.js';
 import * as x509 from '@peculiar/x509';
+import * as constants from '../constants.js';
 
-export class GenesisNetworkDataConstructor {
+import type {KeyManager} from '../key_manager.js';
+import type {ToJSON} from '../../types/index.js';
+import type {NodeAlias, NodeAliases} from '../../types/aliases.js';
+
+/**
+ * Used to construct the nodes data and convert them to JSON
+ */
+export class GenesisNetworkDataConstructor implements ToJSON {
   public readonly nodes: Record<NodeAlias, GenesisNetworkNodeDataWrapper>;
 
-  public constructor (public readonly nodeAliases: NodeAliases) {
+  public constructor(
+    private readonly nodeAliases: NodeAliases,
+    private readonly keyManager: KeyManager,
+    private readonly keysDir: string,
+  ) {
     this.nodeAliases.forEach(nodeAlias => {
-      this.nodes[nodeAlias] = new GenesisNetworkNodeDataWrapper(Templates.nodeIdFromNodeAlias(nodeAlias))
+      const nodeId = Templates.nodeIdFromNodeAlias(nodeAlias);
 
-      const adminKey = PrivateKey.fromStringED25519(constants.GENESIS_KEY)
-      this.nodes[nodeAlias].adminKey = adminKey.publicKey
-    })
+      const adminKey = PrivateKey.fromStringED25519(constants.GENESIS_KEY);
+
+      this.nodes[nodeAlias] = new GenesisNetworkNodeDataWrapper(nodeId, adminKey.publicKey.toStringRaw(), nodeAlias);
+    });
   }
 
   /**
-   * @param keyManager
-   * @param keysDir - !!! config.keysDir !!!
+   * Loads the gossipCaCertificate and grpcCertificateHash
    */
-  public async load (keyManager: KeyManager, keysDir: string) {
-    await Promise.all(this.nodeAliases.map(async nodeAlias => {
-      const nodeKeys = await keyManager.loadSigningKey(nodeAlias, keysDir);
+  public async load() {
+    await Promise.all(
+      this.nodeAliases.map(async nodeAlias => {
+        const nodeKeys = await this.keyManager.loadSigningKey(nodeAlias, this.keysDir);
 
+        const certPem = nodeKeys.certificate.toString();
 
-      const certPem = nodeKeys.certificate.toString()
+        this.nodes[nodeAlias].gossipCaCertificate = certPem;
 
-      this.nodes[nodeAlias].gossipCaCertificate = certPem
+        const tlsCertDer = new Uint8Array(x509.PemConverter.decode(certPem)[0]);
 
-      const tlsCertDer = new Uint8Array(x509.PemConverter.decode(certPem)[0]);
+        const grpcCertificateHash = crypto.createHash('sha384').update(tlsCertDer).digest();
 
-      const grpcCertificateHash = crypto.createHash('sha384').update(tlsCertDer).digest();
-
-      this.nodes[nodeAlias].grpcCertificateHash = grpcCertificateHash.toString();
-    }))
+        this.nodes[nodeAlias].grpcCertificateHash = grpcCertificateHash.toString();
+      }),
+    );
   }
 
-  public toJSON (): string {
-    return JSON.stringify(this.nodes);
+  public toJSON() {
+    return JSON.stringify({
+      nodeMetadata: Object.values(this.nodes).map(node => node.toObject()),
+    });
   }
 }

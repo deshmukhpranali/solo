@@ -42,3 +42,5 @@ export type ConfigBuilder = (argv, ctx, task) => Promise<any>;
 export type Nullable<T> = T | null;
 
 export type IP = string;
+
+export type JsonString = string;

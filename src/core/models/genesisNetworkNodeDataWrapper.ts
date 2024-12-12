@@ -14,45 +14,65 @@
  * limitations under the License.
  *
  */
-import type {Nullable} from '../../types/aliases.js';
-import type {AccountId, Key} from '@hashgraph/sdk';
-import type {ServiceEndpoint} from '../../types/index.js';
+import {parseIpAddressToUint8Array} from '../helpers.js';
+import type {AccountId} from '@hashgraph/sdk';
+import {type GenesisNetworkNodeStructure, type ServiceEndpoint, type ToObject} from '../../types/index.js';
 
-interface Node {
-  nodeId: number;
-  accountId: AccountId | string;
-  description: string;
-  gossipEndpoint: Nullable<ServiceEndpoint>;
-  serviceEndpoint: Nullable<ServiceEndpoint>;
-  gossipCaCertificate: string; // Bytes
-  grpcCertificateHash: string; // Bytes
-  weight: number;
-  deleted: boolean;
-  adminKey: Nullable<Key>;
-}
-
-export class GenesisNetworkNodeDataWrapper implements Node{
-  public readonly nodeId: number;
+export class GenesisNetworkNodeDataWrapper
+  implements GenesisNetworkNodeStructure, ToObject<{node: GenesisNetworkNodeStructure}>
+{
   public accountId: AccountId | string;
-  public readonly description: string;
-  public gossipEndpoint: ServiceEndpoint;
-  public serviceEndpoint: ServiceEndpoint;
+  public gossipEndpoint: ServiceEndpoint[] = [];
+  public serviceEndpoint: ServiceEndpoint[] = [];
   public gossipCaCertificate: string;
   public grpcCertificateHash: string;
-  public readonly weight: number;
-  public readonly deleted: boolean;
-  public adminKey: Nullable<Key>;
+  public weight: number;
+  public readonly deleted = false;
 
-  constructor (nodeId: number) {
-    this.nodeId = nodeId;
-    this.deleted = false;
+  constructor(
+    public readonly nodeId: number,
+    public readonly adminKey: string,
+    public readonly description: string,
+  ) {}
+
+  /**
+   * @param domainName - a fully qualified domain name
+   * @param port
+   */
+  public addServiceEndpoint(domainName: string, port: number): void {
+    this.serviceEndpoint.push({
+      ipAddressV4: parseIpAddressToUint8Array(domainName),
+      domainName,
+      port,
+    });
   }
 
-  addGossipEndpoint (ipAddressV4: string, port: number, domainName: string): void {
-    this.gossipEndpoint = {ipAddressV4, port, domainName};
+  /**
+   * @param domainName - a fully qualified domain name
+   * @param port
+   */
+  public addGossipEndpoint(domainName: string, port: number): void {
+    this.gossipEndpoint.push({
+      ipAddressV4: parseIpAddressToUint8Array(domainName),
+      domainName,
+      port,
+    });
   }
 
-  addServiceEndpoint (ipAddressV4: string, port: number, domainName: string): void {
-    this.serviceEndpoint = {ipAddressV4, port, domainName};
+  public toObject() {
+    return {
+      node: {
+        nodeId: this.nodeId,
+        accountId: this.accountId,
+        description: this.description,
+        gossipEndpoint: this.gossipEndpoint,
+        serviceEndpoint: this.serviceEndpoint,
+        gossipCaCertificate: this.gossipCaCertificate,
+        grpcCertificateHash: this.grpcCertificateHash,
+        weight: this.weight,
+        deleted: this.deleted,
+        adminKey: this.adminKey,
+      },
+    };
   }
 }

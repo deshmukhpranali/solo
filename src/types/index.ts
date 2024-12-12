@@ -19,6 +19,8 @@ import type net from 'net';
 import type * as WebSocket from 'ws';
 import type crypto from 'crypto';
 import type {ListrTask, ListrTaskWrapper} from 'listr2';
+import type {AccountId} from '@hashgraph/sdk';
+import {type JsonString} from './aliases.js';
 
 // NOTE: DO NOT add any Solo imports in this file to avoid circular dependencies
 
@@ -77,14 +79,39 @@ export interface ToObject<T> {
   toObject(): T;
 }
 
+/**
+ * Interface for converting class to JSON string.
+ */
+export interface ToJSON {
+  /**
+   * Converts the class instance to a plain JSON string.
+   *
+   * @returns the plain JSON string of the class.
+   */
+  toJSON(): JsonString;
+}
+
 export type SoloListrTask<T> = ListrTask<T, any, any>;
 
 export type EmptyContextConfig = object;
 
-export type SoloListrTaskWrapper<T> = ListrTaskWrapper<T, any, any>
+export type SoloListrTaskWrapper<T> = ListrTaskWrapper<T, any, any>;
 
 export interface ServiceEndpoint {
-  ipAddressV4: string
-  port: number
-  domainName: string
+  ipAddressV4: Uint8Array;
+  port: number;
+  domainName: string;
+}
+
+export interface GenesisNetworkNodeStructure {
+  nodeId: number;
+  accountId: AccountId | string;
+  description: string;
+  gossipEndpoint: ServiceEndpoint[];
+  serviceEndpoint: ServiceEndpoint[];
+  gossipCaCertificate: string;
+  grpcCertificateHash: string;
+  weight: number;
+  deleted: boolean;
+  adminKey: string;
 }
