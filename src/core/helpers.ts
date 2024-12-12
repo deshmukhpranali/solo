@@ -323,16 +323,14 @@ export function prepareEndpoints(endpointType: string, endpoints: string[], defa
     if (endpointType.toUpperCase() === constants.ENDPOINT_TYPE_IP) {
       ret.push(
         new ServiceEndpoint({
-          // @ts-ignore
-          port,
+          port: +port,
           ipAddressV4: parseIpAddressToUint8Array(url),
         }),
       );
     } else {
       ret.push(
         new ServiceEndpoint({
-          // @ts-ignore
-          port,
+          port: +port,
           domainName: url,
         }),
       );

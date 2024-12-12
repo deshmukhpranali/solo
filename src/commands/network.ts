@@ -263,14 +263,18 @@ export class NetworkCommand extends BaseCommand {
       constants.SOLO_DEPLOYMENT_CHART,
     );
 
-    config.genesisNetworkData = new GenesisNetworkDataConstructor(config.nodeAliases, this.keyManager, config.keysDir);
-
-    config.valuesArg = await this.prepareValuesArg(config);
-
     // compute other config parameters
     config.keysDir = path.join(validatePath(config.cacheDir), 'keys');
     config.stagingDir = Templates.renderStagingDir(config.cacheDir, config.releaseTag);
     config.stagingKeysDir = path.join(validatePath(config.stagingDir), 'keys');
+
+    config.genesisNetworkData = await GenesisNetworkDataConstructor.initialize(
+      config.nodeAliases,
+      this.keyManager,
+      config.keysDir,
+    );
+
+    config.valuesArg = await this.prepareValuesArg(config);
 
     if (!(await this.k8.hasNamespace(config.namespace))) {
       await this.k8.createNamespace(config.namespace);

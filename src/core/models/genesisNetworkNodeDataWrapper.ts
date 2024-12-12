@@ -14,9 +14,8 @@
  * limitations under the License.
  *
  */
-import {parseIpAddressToUint8Array} from '../helpers.js';
 import type {AccountId} from '@hashgraph/sdk';
-import {type GenesisNetworkNodeStructure, type ServiceEndpoint, type ToObject} from '../../types/index.js';
+import type {GenesisNetworkNodeStructure, ServiceEndpoint, ToObject} from '../../types/index.js';
 
 export class GenesisNetworkNodeDataWrapper
   implements GenesisNetworkNodeStructure, ToObject<{node: GenesisNetworkNodeStructure}>
@@ -40,11 +39,7 @@ export class GenesisNetworkNodeDataWrapper
    * @param port
    */
   public addServiceEndpoint(domainName: string, port: number): void {
-    this.serviceEndpoint.push({
-      ipAddressV4: parseIpAddressToUint8Array(domainName),
-      domainName,
-      port,
-    });
+    this.serviceEndpoint.push({domainName, port});
   }
 
   /**
@@ -52,11 +47,7 @@ export class GenesisNetworkNodeDataWrapper
    * @param port
    */
   public addGossipEndpoint(domainName: string, port: number): void {
-    this.gossipEndpoint.push({
-      ipAddressV4: parseIpAddressToUint8Array(domainName),
-      domainName,
-      port,
-    });
+    this.gossipEndpoint.push({domainName, port});
   }
 
   public toObject() {

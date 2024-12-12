@@ -29,9 +29,9 @@ import type {NodeAlias, NodeAliases} from '../../types/aliases.js';
  * Used to construct the nodes data and convert them to JSON
  */
 export class GenesisNetworkDataConstructor implements ToJSON {
-  public readonly nodes: Record<NodeAlias, GenesisNetworkNodeDataWrapper>;
+  public readonly nodes: Record<NodeAlias, GenesisNetworkNodeDataWrapper> = {};
 
-  public constructor(
+  private constructor(
     private readonly nodeAliases: NodeAliases,
     private readonly keyManager: KeyManager,
     private readonly keysDir: string,
@@ -45,23 +45,37 @@ export class GenesisNetworkDataConstructor implements ToJSON {
     });
   }
 
+  public static async initialize(
+    nodeAliases: NodeAliases,
+    keyManager: KeyManager,
+    keysDir: string,
+  ): Promise<GenesisNetworkDataConstructor> {
+    const instance = new GenesisNetworkDataConstructor(nodeAliases, keyManager, keysDir);
+
+    await instance.load();
+
+    return instance;
+  }
+
   /**
    * Loads the gossipCaCertificate and grpcCertificateHash
    */
-  public async load() {
+  private async load() {
     await Promise.all(
       this.nodeAliases.map(async nodeAlias => {
         const nodeKeys = await this.keyManager.loadSigningKey(nodeAlias, this.keysDir);
 
+        //* Convert the certificate to PEM format
         const certPem = nodeKeys.certificate.toString();
 
+        //* Assign the PEM certificate
         this.nodes[nodeAlias].gossipCaCertificate = certPem;
 
+        //* Decode the PEM to DER format
         const tlsCertDer = new Uint8Array(x509.PemConverter.decode(certPem)[0]);
 
-        const grpcCertificateHash = crypto.createHash('sha384').update(tlsCertDer).digest();
-
-        this.nodes[nodeAlias].grpcCertificateHash = grpcCertificateHash.toString();
+        //* Generate the SHA-384 hash
+        this.nodes[nodeAlias].grpcCertificateHash = crypto.createHash('sha384').update(tlsCertDer).digest('hex');
       }),
     );
   }
