@@ -46,5 +46,7 @@ export type IP = string;
 export type JsonString = string;
 
 export type Path = string;
+export type FilePath = string;
+export type DirPath = string;
 
 export type AnyObject = Record<any, any>;

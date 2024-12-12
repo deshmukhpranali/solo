@@ -30,8 +30,9 @@ import * as helpers from './helpers.js';
 import {getNodeAccountMap} from './helpers.js';
 import type {SemVer} from 'semver';
 import type {SoloLogger} from './logging.js';
-import type {AnyObject, NodeAlias, NodeAliases, Path} from '../types/aliases.js';
+import type {AnyObject, DirPath, NodeAlias, NodeAliases, Path} from '../types/aliases.js';
 import type {GenesisNetworkDataConstructor} from './models/genesisNetworkDataConstructor.js';
+import type {Optional} from '../types/index.js';
 
 const consensusSidecars = [
   'recordStreamUploader',
@@ -44,12 +45,12 @@ const consensusSidecars = [
 export class ProfileManager {
   private readonly logger: SoloLogger;
   private readonly configManager: ConfigManager;
-  private readonly cacheDir: string;
+  private readonly cacheDir: DirPath;
 
   private profiles: Map<string, AnyObject>;
-  private profileFile: string | undefined;
+  private profileFile: Optional<string>;
 
-  constructor(logger: SoloLogger, configManager: ConfigManager, cacheDir = constants.SOLO_VALUES_DIR) {
+  constructor(logger: SoloLogger, configManager: ConfigManager, cacheDir: DirPath = constants.SOLO_VALUES_DIR) {
     if (!logger) throw new MissingArgumentError('An instance of core/SoloLogger is required');
     if (!configManager) throw new MissingArgumentError('An instance of core/ConfigManager is required');
 
@@ -176,7 +177,7 @@ export class ProfileManager {
     for (const key in dotItems) {
       let itemKey = key;
 
-      // if it is an array key like extraEnv[0].JAVA_OPTS, convert it into dot separated key as extraEnv.0.JAVA_OPTS
+      // if it is an array key like extraEnv[0].JAVA_OPTS, convert it into a dot separated key as extraEnv.0.JAVA_OPTS
       if (key.indexOf('[') !== -1) {
         itemKey = key.replace('[', '.').replace(']', '');
       }
@@ -370,10 +371,13 @@ export class ProfileManager {
     return this.writeToYaml(cachedValuesFile, yamlRoot);
   }
 
-  public setValueForGenesisNetwork(path: string) {
+  public prepareValuesForGenesisNetwork(genesisNetworkData: GenesisNetworkDataConstructor): Promise<string> {
     const yamlRoot = {};
 
-    this._setFileContentsAsValue('hedera.configMaps.genesisNetworkJson', path, yamlRoot);
+    this._setValue('hedera.configMaps.genesisNetworkJson', genesisNetworkData.toJSON(), yamlRoot);
+
+    const cachedValuesFile = path.join(this.cacheDir, 'genesis-network.yaml');
+    return this.writeToYaml(cachedValuesFile, yamlRoot);
   }
 
   /**
@@ -484,12 +488,15 @@ export class ProfileManager {
     chainId = constants.HEDERA_CHAIN_ID,
     genesisNetworkData?: GenesisNetworkDataConstructor,
   ) {
-    if (!nodeAccountMap || nodeAccountMap.size === 0)
+    if (!nodeAccountMap || nodeAccountMap.size === 0) {
       throw new MissingArgumentError('nodeAccountMap the map of node IDs to account IDs is required');
+    }
+
     if (!releaseTag) throw new MissingArgumentError('release tag is required');
 
-    if (!fs.existsSync(destPath))
+    if (!fs.existsSync(destPath)) {
       throw new IllegalArgumentError(`config destPath does not exist: ${destPath}`, destPath);
+    }
 
     // init variables
     const internalPort = +constants.HEDERA_NODE_INTERNAL_GOSSIP_PORT;
@@ -516,11 +523,11 @@ export class ProfileManager {
           nodeDataWrapper.weight = nodeStakeAmount;
           nodeDataWrapper.accountId = account;
 
-          // Add gossip endpoints
+          //? Add gossip endpoints
           nodeDataWrapper.addGossipEndpoint(externalIP, externalPort);
           nodeDataWrapper.addGossipEndpoint(internalIP, internalPort);
 
-          // Add service endpoints
+          //? Add service endpoints
           nodeDataWrapper.addServiceEndpoint(internalIP, internalPort);
         }
 
