@@ -201,8 +201,6 @@ export class NetworkCommand extends BaseCommand {
       valuesArg += this.prepareValuesFiles(config.valuesFile);
     }
 
-    valuesArg += `--set "hedera.configMaps.genesisNetworkJson=${config.genesisNetworkData.toJSON()}"`;
-
     this.logger.debug('Prepared helm chart values', {valuesArg});
     return valuesArg;
   }
@@ -687,14 +685,6 @@ export class NetworkCommand extends BaseCommand {
     return true;
   }
 
-  prepareGenesisNetworkJson(config: NetworkDeployConfigClass): string {
-    const data = {network: {nodes: []}};
-
-    // TODO
-
-    return JSON.stringify(data);
-  }
-
   getCommandDefinition(): {command: string; desc: string; builder: CommandBuilder} {
     const self = this;
     return {
@@ -777,6 +767,7 @@ export class NetworkCommand extends BaseCommand {
       },
     };
   }
+
   /** Adds the consensus node, envoy and haproxy components to remote config.  */
   public addNodesAndProxies(): ListrTask<any, any, any> {
     return {

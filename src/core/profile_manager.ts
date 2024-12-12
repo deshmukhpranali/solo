@@ -20,7 +20,6 @@ import {SoloError, IllegalArgumentError, MissingArgumentError} from './errors.js
 import * as yaml from 'yaml';
 import dot from 'dot-object';
 import * as semver from 'semver';
-import type {SemVer} from 'semver';
 import {readFile, writeFile} from 'fs/promises';
 
 import {Flags as flags} from '../commands/flags.js';
@@ -28,10 +27,11 @@ import {Templates} from './templates.js';
 import * as constants from './constants.js';
 import {type ConfigManager} from './config_manager.js';
 import * as helpers from './helpers.js';
-import {getNodeAccountMap, parseIpAddressToUint8Array} from './helpers.js';
+import {getNodeAccountMap} from './helpers.js';
+import type {SemVer} from 'semver';
 import type {SoloLogger} from './logging.js';
-import type {NodeAlias, NodeAliases} from '../types/aliases.js';
-import {type GenesisNetworkDataConstructor} from './models/genesisNetworkDataConstructor.js';
+import type {AnyObject, NodeAlias, NodeAliases, Path} from '../types/aliases.js';
+import type {GenesisNetworkDataConstructor} from './models/genesisNetworkDataConstructor.js';
 
 const consensusSidecars = [
   'recordStreamUploader',
@@ -46,10 +46,10 @@ export class ProfileManager {
   private readonly configManager: ConfigManager;
   private readonly cacheDir: string;
 
-  private profiles: Map<string, object>;
+  private profiles: Map<string, AnyObject>;
   private profileFile: string | undefined;
 
-  constructor(logger: SoloLogger, configManager: ConfigManager, cacheDir: string = constants.SOLO_VALUES_DIR) {
+  constructor(logger: SoloLogger, configManager: ConfigManager, cacheDir = constants.SOLO_VALUES_DIR) {
     if (!logger) throw new MissingArgumentError('An instance of core/SoloLogger is required');
     if (!configManager) throw new MissingArgumentError('An instance of core/ConfigManager is required');
 
@@ -62,7 +62,15 @@ export class ProfileManager {
     this.cacheDir = cacheDir;
   }
 
-  loadProfiles(forceReload = false): Map<string, object> {
+  /**
+   * Load profiles from a profile file and populate the profiles map.
+   *
+   * @param [forceReload = false] - forces the profiles map to override even if it exists.
+   * @returns reference to the populated profiles map.
+   *
+   * @throws {IllegalArgumentError} if the profile file is not found.
+   */
+  loadProfiles(forceReload = false): Map<string, AnyObject> {
     const profileFile = this.configManager.getFlag<string>(flags.profileFile);
     if (!profileFile) throw new MissingArgumentError('profileFile is required');
 
@@ -76,7 +84,7 @@ export class ProfileManager {
     // load profile file
     this.profiles = new Map();
     const yamlData = fs.readFileSync(profileFile, 'utf8');
-    const profileItems = yaml.parse(yamlData) as Record<string, object>;
+    const profileItems = yaml.parse(yamlData) as Record<string, AnyObject>;
 
     // add profiles
     for (const key in profileItems) {
@@ -89,15 +97,25 @@ export class ProfileManager {
     return this.profiles;
   }
 
-  getProfile(profileName: string): object {
+  /**
+   * Get profile from the profiles map, loads them on demand if they are not loaded already.
+   *
+   * @param profileName - profile name (key in the map).
+   * @returns the profile.
+   *
+   * @throws {IllegalArgumentError} if profiles can't be loaded or the profile name is not found in the map.
+   */
+  getProfile(profileName: string): AnyObject {
     if (!profileName) throw new MissingArgumentError('profileName is required');
     if (!this.profiles || this.profiles.size <= 0) {
       this.loadProfiles();
     }
 
-    if (!this.profiles || !this.profiles.has(profileName))
+    if (!this.profiles || !this.profiles.has(profileName)) {
       throw new IllegalArgumentError(`Profile does not exists with name: ${profileName}`);
-    return this.profiles.get(profileName) as object;
+    }
+
+    return this.profiles.get(profileName) as AnyObject;
   }
 
   /**
@@ -107,7 +125,7 @@ export class ProfileManager {
    * @param yamlRoot - root of the YAML object
    * @returns
    */
-  _setValue(itemPath: string, value: any, yamlRoot: object): object {
+  _setValue(itemPath: string, value: any, yamlRoot: AnyObject): AnyObject {
     // find the location where to set the value in the YAML
     const itemPathParts: string[] = itemPath.split('.');
     let parent = yamlRoot;
@@ -116,7 +134,7 @@ export class ProfileManager {
     for (let itemPathPart of itemPathParts) {
       if (helpers.isNumeric(itemPathPart)) {
         // @ts-ignore
-        itemPathPart = Number.parseInt(itemPathPart); // numeric path part can only be array index i.e. an integer
+        itemPathPart = Number.parseInt(itemPathPart); // numeric path part can only be array index i.e., an integer
         if (!Array.isArray(parent[prevItemPath])) {
           parent[prevItemPath] = [];
         }
@@ -145,12 +163,12 @@ export class ProfileManager {
 
   /**
    * Set items for the chart
-   * @param itemPath - item path in the yaml, if empty then root of the yaml object will be used
+   * @param itemPath - item path in the YAML, if empty then root of the YAML object will be used
    * @param items - the element object
-   * @param yamlRoot - root of the yaml object to update
+   * @param yamlRoot - root of the YAML object to update
    * @private
    */
-  _setChartItems(itemPath: string, items: any, yamlRoot: object) {
+  _setChartItems(itemPath: string, items: any, yamlRoot: AnyObject) {
     if (!items) return;
 
     const dotItems = dot.dot(items);
@@ -172,11 +190,11 @@ export class ProfileManager {
   }
 
   resourcesForConsensusPod(
-    profile: any,
+    profile: AnyObject,
     nodeAliases: NodeAliases,
-    yamlRoot: object,
+    yamlRoot: AnyObject,
     genesisNetworkData?: GenesisNetworkDataConstructor,
-  ): object {
+  ): AnyObject {
     if (!profile) throw new MissingArgumentError('profile is required');
 
     const accountMap = getNodeAccountMap(nodeAliases);
@@ -266,26 +284,26 @@ export class ProfileManager {
     return yamlRoot;
   }
 
-  resourcesForHaProxyPod(profile: any, yamlRoot: object) {
+  private resourcesForHaProxyPod(profile: AnyObject, yamlRoot: AnyObject) {
     if (!profile) throw new MissingArgumentError('profile is required');
     if (!profile.haproxy) return; // use chart defaults
 
     return this._setChartItems('defaults.haproxy', profile.haproxy, yamlRoot);
   }
 
-  resourcesForEnvoyProxyPod(profile: any, yamlRoot: object) {
+  private resourcesForEnvoyProxyPod(profile: AnyObject, yamlRoot: AnyObject) {
     if (!profile) throw new MissingArgumentError('profile is required');
     if (!profile.envoyProxy) return; // use chart defaults
     return this._setChartItems('defaults.envoyProxy', profile.envoyProxy, yamlRoot);
   }
 
-  resourcesForHederaExplorerPod(profile: any, yamlRoot: object) {
+  private resourcesForHederaExplorerPod(profile: AnyObject, yamlRoot: AnyObject) {
     if (!profile) throw new MissingArgumentError('profile is required');
     if (!profile.explorer) return;
     return this._setChartItems('', profile.explorer, yamlRoot);
   }
 
-  resourcesForMinioTenantPod(profile: any, yamlRoot: object) {
+  private resourcesForMinioTenantPod(profile: AnyObject, yamlRoot: AnyObject) {
     if (!profile) throw new MissingArgumentError('profile is required');
     // @ts-ignore
     if (!profile.minio || !profile.minio.tenant) return; // use chart defaults
@@ -306,11 +324,11 @@ export class ProfileManager {
 
   /**
    * Prepare a values file for Solo Helm chart
-   * @param profileName resource profile name
-   * @param genesisNetworkData
+   * @param profileName - resource profile name
+   * @param genesisNetworkData - reference to the constructor
    * @returns return the full path to the values file
    */
-  prepareValuesForSoloChart(profileName: string, genesisNetworkData?: GenesisNetworkDataConstructor) {
+  public async prepareValuesForSoloChart(profileName: string, genesisNetworkData?: GenesisNetworkDataConstructor) {
     if (!profileName) throw new MissingArgumentError('profileName is required');
     const profile = this.getProfile(profileName);
 
@@ -324,20 +342,11 @@ export class ProfileManager {
     this.resourcesForEnvoyProxyPod(profile, yamlRoot);
     this.resourcesForMinioTenantPod(profile, yamlRoot);
 
-    // write the YAML
     const cachedValuesFile = path.join(this.cacheDir, `solo-${profileName}.yaml`);
-    return new Promise<string>((resolve, reject) => {
-      fs.writeFile(cachedValuesFile, yaml.stringify(yamlRoot), err => {
-        if (err) {
-          reject(err);
-        }
-
-        resolve(cachedValuesFile);
-      });
-    });
+    return this.writeToYaml(cachedValuesFile, yamlRoot);
   }
 
-  async bumpHederaConfigVersion(applicationPropertiesPath: string) {
+  private async bumpHederaConfigVersion(applicationPropertiesPath: string) {
     const lines = (await readFile(applicationPropertiesPath, 'utf-8')).split('\n');
 
     for (const line of lines) {
@@ -351,23 +360,20 @@ export class ProfileManager {
     await writeFile(applicationPropertiesPath, lines.join('\n'));
   }
 
-  async prepareValuesForNodeAdd(configTxtPath: string, applicationPropertiesPath: string) {
+  public async prepareValuesForNodeAdd(configTxtPath: string, applicationPropertiesPath: string) {
     const yamlRoot = {};
     this._setFileContentsAsValue('hedera.configMaps.configTxt', configTxtPath, yamlRoot);
     await this.bumpHederaConfigVersion(applicationPropertiesPath);
     this._setFileContentsAsValue('hedera.configMaps.applicationProperties', applicationPropertiesPath, yamlRoot);
 
-    // write the yaml
     const cachedValuesFile = path.join(this.cacheDir, 'solo-node-add.yaml');
-    return new Promise<string>((resolve, reject) => {
-      fs.writeFile(cachedValuesFile, yaml.stringify(yamlRoot), err => {
-        if (err) {
-          reject(err);
-        }
+    return this.writeToYaml(cachedValuesFile, yamlRoot);
+  }
 
-        resolve(cachedValuesFile);
-      });
-    });
+  public setValueForGenesisNetwork(path: string) {
+    const yamlRoot = {};
+
+    this._setFileContentsAsValue('hedera.configMaps.genesisNetworkJson', path, yamlRoot);
   }
 
   /**
@@ -375,38 +381,38 @@ export class ProfileManager {
    * @param profileName - resource profile name
    * @returns return the full path to the values file
    */
-  prepareValuesForRpcRelayChart(profileName: string) {
+  public async prepareValuesForRpcRelayChart(profileName: string) {
     if (!profileName) throw new MissingArgumentError('profileName is required');
-    const profile = this.getProfile(profileName) as any;
+    const profile = this.getProfile(profileName) as AnyObject;
     if (!profile.rpcRelay) return Promise.resolve(); // use chart defaults
 
     // generate the YAML
     const yamlRoot = {};
     this._setChartItems('', profile.rpcRelay, yamlRoot);
 
-    // write the YAML
     const cachedValuesFile = path.join(this.cacheDir, `rpcRelay-${profileName}.yaml`);
-    return new Promise<string>((resolve, reject) => {
-      fs.writeFile(cachedValuesFile, yaml.stringify(yamlRoot), err => {
-        if (err) {
-          reject(err);
-        }
-
-        resolve(cachedValuesFile);
-      });
-    });
+    return this.writeToYaml(cachedValuesFile, yamlRoot);
   }
 
-  prepareValuesHederaExplorerChart(profileName: string) {
+  public async prepareValuesHederaExplorerChart(profileName: string) {
     if (!profileName) throw new MissingArgumentError('profileName is required');
-    const profile = this.getProfile(profileName) as any;
+    const profile = this.getProfile(profileName) as AnyObject;
     // generate the YAML
     const yamlRoot = {};
     this.resourcesForHederaExplorerPod(profile, yamlRoot);
 
-    // write the YAML
     const cachedValuesFile = path.join(this.cacheDir, `explorer-${profileName}.yaml`);
-    return new Promise<string>((resolve, reject) => {
+    return this.writeToYaml(cachedValuesFile, yamlRoot);
+  }
+
+  /**
+   * Writes the YAML to file.
+   *
+   * @param cachedValuesFile - the target file to write the YAML root to.
+   * @param yamlRoot - object to turn into YAML and write to file.
+   */
+  private async writeToYaml(cachedValuesFile: Path, yamlRoot: AnyObject) {
+    return await new Promise<string>((resolve, reject) => {
       fs.writeFile(cachedValuesFile, yaml.stringify(yamlRoot), err => {
         if (err) {
           reject(err);
@@ -422,9 +428,9 @@ export class ProfileManager {
    * @param profileName - resource profile name
    * @returns the full path to the values file
    */
-  prepareValuesForMirrorNodeChart(profileName: string) {
+  public async prepareValuesForMirrorNodeChart(profileName: string) {
     if (!profileName) throw new MissingArgumentError('profileName is required');
-    const profile = this.getProfile(profileName) as any;
+    const profile = this.getProfile(profileName) as AnyObject;
     if (!profile.mirror) return Promise.resolve(); // use chart defaults
 
     // generate the YAML
@@ -443,26 +449,17 @@ export class ProfileManager {
     this._setChartItems('grpc', profile.mirror.grpc, yamlRoot);
     this._setChartItems('monitor', profile.mirror.monitor, yamlRoot);
 
-    // write the YAML
     const cachedValuesFile = path.join(this.cacheDir, `mirror-${profileName}.yaml`);
-    return new Promise<string>((resolve, reject) => {
-      fs.writeFile(cachedValuesFile, yaml.stringify(yamlRoot), err => {
-        if (err) {
-          reject(err);
-        }
-
-        resolve(cachedValuesFile);
-      });
-    });
+    return this.writeToYaml(cachedValuesFile, yamlRoot);
   }
 
   /**
-   * Writes the contents of a file as a value for the given nested item path in the yaml object
-   * @param itemPath - nested item path in the yaml object to store the file contents
-   * @param valueFilePath - path to the file whose contents will be stored in the yaml object
-   * @param yamlRoot - root of the yaml object
+   * Writes the contents of a file as a value for the given nested item path in the YAML object
+   * @param itemPath - nested item path in the YAML object to store the file contents
+   * @param valueFilePath - path to the file whose contents will be stored in the YAML object
+   * @param yamlRoot - root of the YAML object
    */
-  private _setFileContentsAsValue(itemPath: string, valueFilePath: string, yamlRoot: object) {
+  private _setFileContentsAsValue(itemPath: string, valueFilePath: string, yamlRoot: AnyObject) {
     const fileContents = fs.readFileSync(valueFilePath, 'utf8');
     this._setValue(itemPath, fileContents, yamlRoot);
   }
@@ -548,7 +545,7 @@ export class ProfileManager {
       fs.writeFileSync(configFilePath, configLines.join('\n'));
 
       return configFilePath;
-    } catch (e: Error | any) {
+    } catch (e: Error | unknown) {
       throw new SoloError('failed to generate config.txt', e);
     }
   }
