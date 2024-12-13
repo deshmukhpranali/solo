@@ -6,7 +6,7 @@ includes:
 env:
   SOLO_NETWORK_SIZE: 2
   SOLO_NAMESPACE: solo-e2e
-  SOLO_CHART_VERSION: 0.36.1
+  SOLO_CHART_VERSION: 0.36.3
   CONSENSUS_NODE_VERSION: v0.57.2
 vars:
   ip_list_template_file: "{{.ROOT_DIR}}/list-external-ips.gotemplate"
@@ -54,7 +54,7 @@ tasks:
     deps:
       - task: "init"
     cmds:
-      - SOLO_HOME_DIR=${SOLO_HOME_DIR} npm run solo -- mirror-node deploy --namespace "${SOLO_NAMESPACE}"
+      - SOLO_HOME_DIR=${SOLO_HOME_DIR} npm run solo -- mirror-node deploy --namespace "${SOLO_NAMESPACE}" -q
       - echo "Enable port forwarding for Hedera Explorer & Mirror Node Network"
       - kubectl port-forward -n "${SOLO_NAMESPACE}" svc/hedera-explorer 8080:80 &
       - kubectl port-forward svc/mirror-grpc -n "${SOLO_NAMESPACE}" 5600:5600 &
@@ -67,7 +67,7 @@ tasks:
     deps:
       - task: "init"
     cmds:
-      - SOLO_HOME_DIR=${SOLO_HOME_DIR} npm run solo -- mirror-node destroy --namespace "${SOLO_NAMESPACE}" --force || true
+      - SOLO_HOME_DIR=${SOLO_HOME_DIR} npm run solo -- mirror-node destroy --namespace "${SOLO_NAMESPACE}" --force -q || true
 
   destroy:
     desc: destroy relay, mirror-node, and network
