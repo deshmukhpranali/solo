@@ -1026,41 +1026,44 @@ export class K8 {
 
       const check = async (resolve: (items: k8s.V1Pod[]) => void, reject: (reason?: any) => void) => {
         // wait for the pod to be available with the given status and labels
-        const resp = await this.kubeClient.listNamespacedPod(
-          ns,
-          // @ts-ignore
-          false,
-          false,
-          undefined,
-          undefined,
-          labelSelector,
-          podCount,
-          undefined,
-          undefined,
-          undefined,
-          Duration.ofMinutes(5).toMillis(),
-        );
+        try {
+          const resp = await this.kubeClient.listNamespacedPod(
+            ns,
+            // @ts-ignore
+            false,
+            false,
+            undefined,
+            undefined,
+            labelSelector,
+            podCount,
+            undefined,
+            undefined,
+            undefined,
+            Duration.ofMinutes(5).toMillis(),
+          );
+          this.logger.debug(
+            `[attempt: ${attempts}/${maxAttempts}] ${resp.body?.items?.length}/${podCount} pod found [labelSelector: ${labelSelector}, namespace:${ns}]`,
+          );
+          if (resp.body?.items?.length === podCount) {
+            let phaseMatchCount = 0;
+            let predicateMatchCount = 0;
 
-        this.logger.debug(
-          `[attempt: ${attempts}/${maxAttempts}] ${resp.body?.items?.length}/${podCount} pod found [labelSelector: ${labelSelector}, namespace:${ns}]`,
-        );
-        if (resp.body?.items?.length === podCount) {
-          let phaseMatchCount = 0;
-          let predicateMatchCount = 0;
+            for (const item of resp.body.items) {
+              if (phases.includes(item.status?.phase)) {
+                phaseMatchCount++;
+              }
 
-          for (const item of resp.body.items) {
-            if (phases.includes(item.status?.phase)) {
-              phaseMatchCount++;
+              if (podItemPredicate && podItemPredicate(item)) {
+                predicateMatchCount++;
+              }
             }
 
-            if (podItemPredicate && podItemPredicate(item)) {
-              predicateMatchCount++;
+            if (phaseMatchCount === podCount && (!podItemPredicate || predicateMatchCount === podCount)) {
+              return resolve(resp.body.items);
             }
           }
-
-          if (phaseMatchCount === podCount && (!podItemPredicate || predicateMatchCount === podCount)) {
-            return resolve(resp.body.items);
-          }
+        } catch (e: Error | any) {
+          this.logger.info('Error occurred while waiting for pods, retrying', e);
         }
 
         if (++attempts < maxAttempts) {
