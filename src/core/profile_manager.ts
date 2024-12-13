@@ -264,6 +264,13 @@ export class ProfileManager {
       path.join(stagingDir, 'templates', 'bootstrap.properties'),
       yamlRoot,
     );
+
+    const genesisNetworkJson = path.join(stagingDir, 'genesis-network.json');
+
+    fs.writeFileSync(genesisNetworkJson, genesisNetworkData.toJSON());
+
+    this._setFileContentsAsValue('hedera.configMaps.genesisNetworkJson', genesisNetworkJson, yamlRoot);
+
     if (this.configManager.getFlag(flags.applicationEnv)) {
       this._setFileContentsAsValue(
         'hedera.configMaps.applicationEnv',
@@ -368,15 +375,6 @@ export class ProfileManager {
     this._setFileContentsAsValue('hedera.configMaps.applicationProperties', applicationPropertiesPath, yamlRoot);
 
     const cachedValuesFile = path.join(this.cacheDir, 'solo-node-add.yaml');
-    return this.writeToYaml(cachedValuesFile, yamlRoot);
-  }
-
-  public prepareValuesForGenesisNetwork(genesisNetworkData: GenesisNetworkDataConstructor): Promise<string> {
-    const yamlRoot = {};
-
-    this._setValue('hedera.configMaps.genesisNetworkJson', genesisNetworkData.toJSON(), yamlRoot);
-
-    const cachedValuesFile = path.join(this.cacheDir, 'genesis-network.yaml');
     return this.writeToYaml(cachedValuesFile, yamlRoot);
   }
 
@@ -525,7 +523,6 @@ export class ProfileManager {
 
           //? Add gossip endpoints
           nodeDataWrapper.addGossipEndpoint(externalIP, externalPort);
-          nodeDataWrapper.addGossipEndpoint(internalIP, internalPort);
 
           //? Add service endpoints
           nodeDataWrapper.addServiceEndpoint(internalIP, internalPort);

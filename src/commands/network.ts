@@ -169,11 +169,6 @@ export class NetworkCommand extends BaseCommand {
       valuesArg += this.prepareValuesFiles(this.profileValuesFile);
     }
 
-    const genesisNetworkDataFile = await this.profileManager.prepareValuesForGenesisNetwork(config.genesisNetworkData);
-    if (genesisNetworkDataFile) {
-      valuesArg += this.prepareValuesFiles(genesisNetworkDataFile);
-    }
-
     // do not deploy mirror node until after we have the updated address book
     valuesArg += ` --set "telemetry.prometheus.svcMonitor.enabled=${config.enablePrometheusSvcMonitor}"`;
 
