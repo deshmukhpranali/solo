@@ -5,7 +5,7 @@ includes:
     flatten: true
 env:
   SOLO_NETWORK_SIZE: 10
-  SOLO_NAMESPACE: solo-alex-kuzmin-n4
+  SOLO_NAMESPACE: solo-perf-hashsphere-lat
   SOLO_CHART_VERSION: 0.36.1
   CONSENSUS_NODE_VERSION: v0.57.2
   VALUES_FLAG: "--values-file init-containers-values.yaml"
