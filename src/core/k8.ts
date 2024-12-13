@@ -1573,7 +1573,7 @@ export class K8 {
       const scriptName = 'support-zip.sh';
       const sourcePath = path.join(constants.RESOURCES_DIR, scriptName); // script source path
       await this.copyTo(podName, ROOT_CONTAINER, sourcePath, `${HEDERA_HAPI_PATH}`);
-      await sleep(Duration.ofSeconds(1)); // wait for the script to sync to the file system
+      await sleep(Duration.ofSeconds(3)); // wait for the script to sync to the file system
       await this.execContainer(podName, ROOT_CONTAINER, [
         'bash',
         '-c',
