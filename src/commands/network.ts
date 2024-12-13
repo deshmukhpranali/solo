@@ -361,7 +361,7 @@ export class NetworkCommand extends BaseCommand {
         },
         {
           title: 'Check if cluster setup chart is installed',
-          task: async (ctx, task) => {
+          task: async () => {
             const isChartInstalled = await this.chartManager.isChartInstalled('', constants.SOLO_CLUSTER_SETUP_CHART);
             if (!isChartInstalled) {
               throw new SoloError(
