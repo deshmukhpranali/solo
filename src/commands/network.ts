@@ -712,9 +712,10 @@ export class NetworkCommand extends BaseCommand {
                 y,
                 flags.deletePvcs,
                 flags.deleteSecrets,
+                flags.enableTimeout,
                 flags.force,
                 flags.namespace,
-                flags.enableTimeout,
+                flags.quiet,
               ),
             handler: (argv: any) => {
               self.logger.debug("==== Running 'network destroy' ===");
