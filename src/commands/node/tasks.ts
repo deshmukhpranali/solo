@@ -405,8 +405,7 @@ export class NodeCommandTasks {
         clearTimeout(timeoutId);
       } catch (e: Error | any) {
         this.logger.debug(
-          `${title} : Error in checking node activeness: attempt: ${attempt}/${maxAttempts}: ${e?.message}`,
-          e,
+          `${title} : Error in checking node activeness: attempt: ${attempt}/${maxAttempts}: ${JSON.stringify(e)}`,
         );
       }
 
