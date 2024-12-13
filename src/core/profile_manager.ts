@@ -31,7 +31,7 @@ import {getNodeAccountMap} from './helpers.js';
 import type {SemVer} from 'semver';
 import type {SoloLogger} from './logging.js';
 import type {AnyObject, DirPath, NodeAlias, NodeAliases, Path} from '../types/aliases.js';
-import type {GenesisNetworkDataConstructor} from './models/genesisNetworkDataConstructor.js';
+import type {GenesisNetworkDataConstructor} from './genesis_network_models/genesis_network_data_constructor.js';
 import type {Optional} from '../types/index.js';
 
 const consensusSidecars = [

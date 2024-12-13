@@ -23,7 +23,7 @@ import * as constants from '../constants.js';
 
 import type {KeyManager} from '../key_manager.js';
 import type {ToJSON} from '../../types/index.js';
-import type {NodeAlias, NodeAliases} from '../../types/aliases.js';
+import type {JsonString, NodeAlias, NodeAliases} from '../../types/aliases.js';
 
 /**
  * Used to construct the nodes data and convert them to JSON
@@ -36,13 +36,13 @@ export class GenesisNetworkDataConstructor implements ToJSON {
     private readonly keyManager: KeyManager,
     private readonly keysDir: string,
   ) {
-    this.nodeAliases.forEach(nodeAlias => {
+    for (const nodeAlias of nodeAliases) {
       const nodeId = Templates.nodeIdFromNodeAlias(nodeAlias);
+      const adminPrivateKey = PrivateKey.fromStringED25519(constants.GENESIS_KEY);
+      const adminPubKey = adminPrivateKey.publicKey.toStringRaw();
 
-      const adminKey = PrivateKey.fromStringED25519(constants.GENESIS_KEY);
-
-      this.nodes[nodeAlias] = new GenesisNetworkNodeDataWrapper(nodeId, adminKey.publicKey.toStringRaw(), nodeAlias);
-    });
+      this.nodes[nodeAlias] = new GenesisNetworkNodeDataWrapper(nodeId, adminPubKey, nodeAlias);
+    }
   }
 
   public static async initialize(
@@ -80,7 +80,7 @@ export class GenesisNetworkDataConstructor implements ToJSON {
     );
   }
 
-  public toJSON() {
+  public toJSON(): JsonString {
     return JSON.stringify({
       nodeMetadata: Object.values(this.nodes).map(node => node.toObject()),
     });

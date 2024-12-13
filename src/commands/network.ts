@@ -38,7 +38,7 @@ import {ConsensusNodeComponent} from '../core/config/remote/components/consensus
 import {ConsensusNodeStates} from '../core/config/remote/enumerations.js';
 import {EnvoyProxyComponent} from '../core/config/remote/components/envoy_proxy_component.js';
 import {HaProxyComponent} from '../core/config/remote/components/ha_proxy_component.js';
-import {GenesisNetworkDataConstructor} from '../core/models/genesisNetworkDataConstructor.js';
+import {GenesisNetworkDataConstructor} from '../core/genesis_network_models/genesis_network_data_constructor.js';
 
 export interface NetworkDeployConfigClass {
   applicationEnv: string;
