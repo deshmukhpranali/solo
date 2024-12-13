@@ -20,8 +20,7 @@ vars:
   minio_flag:
     sh: (echo "/tmp/minio-flag-$(date +\"%Y%m%d%H%M%S\")")
 
-  # TODO: open ticket to override solo_home_dir
-  # TODO: open ticket solo node stop gets stuck  on check network pod if the namespace has already been deleted
+  # TODO: test local build path
 
 env:
   SOLO_CLUSTER_SETUP_NAMESPACE: solo-setup
@@ -255,6 +254,7 @@ tasks:
 
   solo:cluster:minio:
     internal: true
+    silent: true
     cmds:
       - |
         if ! kubectl get svc -l app.kubernetes.io/name=minio-operator --all-namespaces --no-headers | grep -q . ; then
