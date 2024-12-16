@@ -17,7 +17,7 @@ vars:
     sh: (echo "/tmp/run-build-$(date +%Y%m%d%H%M%S)")
   var_check_file:
     sh: (echo "/tmp/var-check-$(date +%Y%m%d%H%M%S)")
-  minio_flag:
+  minio_flag_file:
     sh: (echo "/tmp/minio-flag-$(date +%Y%m%d%H%M%S)")
 
   # TODO: test local build path
@@ -259,21 +259,23 @@ tasks:
     cmds:
       - |
         if ! kubectl get svc -l app.kubernetes.io/instance=minio-operator --all-namespaces --no-headers | grep -q . ; then
-        echo "No services found with label app.kubernetes.io/name=operator app.kubernetes.io/instance=minio-operator"
-        echo "--minio" > {{ .minio_flag }}
+          echo "No services found with label app.kubernetes.io/name=operator app.kubernetes.io/instance=minio-operator"
+          echo "--minio" > {{ .minio_flag_file }}
         else 
-        echo "--no-minio" > {{ .minio_flag }}
+          echo "--no-minio" > {{ .minio_flag_file }}
         fi
 
   solo:cluster:setup:
+    silent: true
     deps:
       - task: "init"
       - task: "solo:cluster:minio"
     status:
       - helm list --all-namespaces | grep -qz "${SOLO_CLUSTER_RELEASE_NAME}"
     cmds:
-      - export MINIO_FLAG=$(cat {{ .minio_flag }})
-      - SOLO_HOME_DIR=${SOLO_HOME_DIR} npm run solo -- cluster setup --cluster-setup-namespace "${SOLO_CLUSTER_SETUP_NAMESPACE}" ${MINIO_FLAG} -q
+      - |
+        export MINIO_FLAG=$(cat {{ .minio_flag_file }})
+        SOLO_HOME_DIR=${SOLO_HOME_DIR} npm run solo -- cluster setup --cluster-setup-namespace "${SOLO_CLUSTER_SETUP_NAMESPACE}" ${MINIO_FLAG} -q
 
   solo:node:addresses:
     internal: true
