@@ -6,7 +6,7 @@ add "--values-file init-containers-values.yaml"
 
 Example:
 
-> solo:custom:network:deploy:
+> solo:network:deploy:
 > internal: true
 > cmds:
 > \- npm run solo-test -- network deploy --namespace "${SOLO\_NAMESPACE}" --node-aliases-unparsed {{.node\_identifiers}}  --solo-chart-version "${SOLO\_CHART\_VERSION}" --settings-txt settings.txt --log4j2-xml log4j2.xml --values-file init-containers-values.yaml --application-properties application.properties

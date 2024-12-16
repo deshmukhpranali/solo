@@ -25,7 +25,7 @@ tasks:
       - task: "solo:init"
       - task: "solo:cluster:setup"
       - task: "solo:keys"
-      - task: "solo:custom:network:deploy"
+      - task: "solo:network:deploy"
 
   destroy:
     deps:

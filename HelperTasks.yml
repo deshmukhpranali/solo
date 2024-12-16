@@ -152,8 +152,8 @@ tasks:
     deps:
       - task: "init"
     cmds:
-      - SOLO_HOME_DIR=${SOLO_HOME_DIR} npm run solo -- network deploy --namespace "${SOLO_NAMESPACE}" --node-aliases-unparsed {{.node_identifiers}} --release-tag "${CONSENSUS_NODE_VERSION}" --solo-chart-version "${SOLO_CHART_VERSION}" -q
-      - SOLO_HOME_DIR=${SOLO_HOME_DIR} npm run solo -- node setup --namespace "${SOLO_NAMESPACE}" --node-aliases-unparsed {{.node_identifiers}} --release-tag "${CONSENSUS_NODE_VERSION}" -q
+      - SOLO_HOME_DIR=${SOLO_HOME_DIR} npm run solo -- network deploy --namespace "${SOLO_NAMESPACE}" --node-aliases-unparsed {{.node_identifiers}} --release-tag "${CONSENSUS_NODE_VERSION}" --solo-chart-version "${SOLO_CHART_VERSION}" ${VALUES_FLAG} ${SETTINGS_FLAG}  ${LOG4J2_FLAG} ${APPLICATION_PROPERTIES_FLAG} -q
+      - SOLO_HOME_DIR=${SOLO_HOME_DIR} npm run solo -- node setup --namespace "${SOLO_NAMESPACE}" --node-aliases-unparsed {{.node_identifiers}} --release-tag "${CONSENSUS_NODE_VERSION}" ${LOCAL_BUILD_FLAG} -q
 
   solo:network:destroy:
     internal: true
@@ -278,14 +278,6 @@ tasks:
     internal: true
     cmds:
       - kubectl get svc -n "${SOLO_NAMESPACE}" -l "solo.hedera.com/type=network-node-svc" --output=go-template-file={{ .ip_list_template_file }}
-
-  solo:custom:network:deploy:
-    internal: true
-    deps:
-      - task: "init"
-    cmds:
-      - SOLO_HOME_DIR=${SOLO_HOME_DIR} npm run solo -- network deploy --namespace "${SOLO_NAMESPACE}" --node-aliases-unparsed {{.node_identifiers}} --release-tag "${CONSENSUS_NODE_VERSION}" --solo-chart-version "${SOLO_CHART_VERSION}" ${VALUES_FLAG} ${SETTINGS_FLAG}  ${LOG4J2_FLAG} ${APPLICATION_PROPERTIES_FLAG} -q
-      - SOLO_HOME_DIR=${SOLO_HOME_DIR} npm run solo -- node setup --namespace "${SOLO_NAMESPACE}" --node-aliases-unparsed {{.node_identifiers}} --release-tag "${CONSENSUS_NODE_VERSION}" ${LOCAL_BUILD_FLAG} -q
 
   start:
     desc: solo node start
