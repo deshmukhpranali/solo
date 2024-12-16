@@ -20,7 +20,7 @@ import type {GenesisNetworkNodeStructure, ServiceEndpoint, ToObject} from '../..
 export class GenesisNetworkNodeDataWrapper
   implements GenesisNetworkNodeStructure, ToObject<{node: GenesisNetworkNodeStructure}>
 {
-  public accountId: AccountId | string;
+  public accountId: AccountId;
   public gossipEndpoint: ServiceEndpoint[] = [];
   public serviceEndpoint: ServiceEndpoint[] = [];
   public gossipCaCertificate: string;
@@ -50,6 +50,7 @@ export class GenesisNetworkNodeDataWrapper
     this.gossipEndpoint.push({domainName, port});
   }
 
+  // @ts-ignore
   public toObject() {
     return {
       node: {

@@ -28,6 +28,7 @@ import * as constants from './constants.js';
 import {type ConfigManager} from './config_manager.js';
 import * as helpers from './helpers.js';
 import {getNodeAccountMap} from './helpers.js';
+import {AccountId} from '@hashgraph/sdk';
 import type {SemVer} from 'semver';
 import type {SoloLogger} from './logging.js';
 import type {AnyObject, DirPath, NodeAlias, NodeAliases, Path} from '../types/aliases.js';
@@ -519,7 +520,7 @@ export class ProfileManager {
           const nodeDataWrapper = genesisNetworkData.nodes[nodeAlias];
 
           nodeDataWrapper.weight = nodeStakeAmount;
-          nodeDataWrapper.accountId = account;
+          nodeDataWrapper.accountId = AccountId.fromString(account);
 
           //? Add gossip endpoints
           nodeDataWrapper.addGossipEndpoint(externalIP, externalPort);
