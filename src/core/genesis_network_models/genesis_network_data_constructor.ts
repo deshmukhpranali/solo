@@ -39,7 +39,7 @@ export class GenesisNetworkDataConstructor implements ToJSON {
     for (const nodeAlias of nodeAliases) {
       const nodeId = Templates.nodeIdFromNodeAlias(nodeAlias);
       const adminPrivateKey = PrivateKey.fromStringED25519(constants.GENESIS_KEY);
-      const adminPubKey = adminPrivateKey.publicKey.toStringRaw();
+      const adminPubKey = adminPrivateKey.publicKey;
 
       this.nodes[nodeAlias] = new GenesisNetworkNodeDataWrapper(nodeId, adminPubKey, nodeAlias);
     }
@@ -69,7 +69,7 @@ export class GenesisNetworkDataConstructor implements ToJSON {
         const certPem = nodeKeys.certificate.toString();
 
         //* Assign the PEM certificate
-        this.nodes[nodeAlias].gossipCaCertificate = certPem;
+        this.nodes[nodeAlias].gossipCaCertificate = nodeKeys.certificate.toString('base64');
 
         //* Decode the PEM to DER format
         const tlsCertDer = new Uint8Array(x509.PemConverter.decode(certPem)[0]);

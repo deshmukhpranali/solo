@@ -14,7 +14,7 @@
  * limitations under the License.
  *
  */
-import type {AccountId} from '@hashgraph/sdk';
+import type {AccountId, PublicKey} from '@hashgraph/sdk';
 import type {GenesisNetworkNodeStructure, ServiceEndpoint, ToObject} from '../../types/index.js';
 
 export class GenesisNetworkNodeDataWrapper
@@ -30,7 +30,7 @@ export class GenesisNetworkNodeDataWrapper
 
   constructor(
     public readonly nodeId: number,
-    public readonly adminKey: string,
+    public readonly adminKey: PublicKey,
     public readonly description: string,
   ) {}
 
@@ -39,7 +39,7 @@ export class GenesisNetworkNodeDataWrapper
    * @param port
    */
   public addServiceEndpoint(domainName: string, port: number): void {
-    this.serviceEndpoint.push({domainName, port});
+    this.serviceEndpoint.push({domainName, port, ipAddressV4: ''});
   }
 
   /**
@@ -47,10 +47,9 @@ export class GenesisNetworkNodeDataWrapper
    * @param port
    */
   public addGossipEndpoint(domainName: string, port: number): void {
-    this.gossipEndpoint.push({domainName, port});
+    this.gossipEndpoint.push({domainName, port, ipAddressV4: ''});
   }
 
-  // @ts-ignore
   public toObject() {
     return {
       node: {
