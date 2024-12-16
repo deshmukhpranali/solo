@@ -14,11 +14,11 @@ vars:
   solo_keys_dir: "{{ .solo_cache_dir }}/keys"
   solo_bin_dir: "{{ .solo_user_dir }}/bin"
   run_build_file:
-    sh: (echo "/tmp/run-build-$(date +\"%Y%m%d%H%M%S\")")
+    sh: (echo "/tmp/run-build-$(date +%Y%m%d%H%M%S)")
   var_check_file:
-    sh: (echo "/tmp/var-check-$(date +\"%Y%m%d%H%M%S\")")
+    sh: (echo "/tmp/var-check-$(date +%Y%m%d%H%M%S)")
   minio_flag:
-    sh: (echo "/tmp/minio-flag-$(date +\"%Y%m%d%H%M%S\")")
+    sh: (echo "/tmp/minio-flag-$(date +%Y%m%d%H%M%S)")
 
   # TODO: test local build path
 
@@ -117,6 +117,7 @@ tasks:
 
   solo:init:
     internal: true
+    silent: true
     deps:
       - task: "init"
     status:
@@ -257,8 +258,8 @@ tasks:
     silent: true
     cmds:
       - |
-        if ! kubectl get svc -l app.kubernetes.io/name=minio-operator --all-namespaces --no-headers | grep -q . ; then
-        echo "No services found with label app.kubernetes.io/name=minio-operator"
+        if ! kubectl get svc -l app.kubernetes.io/instance=minio-operator --all-namespaces --no-headers | grep -q . ; then
+        echo "No services found with label app.kubernetes.io/name=operator app.kubernetes.io/instance=minio-operator"
         echo "--minio" > {{ .minio_flag }}
         else 
         echo "--no-minio" > {{ .minio_flag }}
