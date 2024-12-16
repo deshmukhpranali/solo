@@ -31,7 +31,6 @@ tasks:
     deps:
       - task: "init"
     cmds:
-      - task: "solo:node:stop"
       - task: "solo:network:destroy"
 
   clean:

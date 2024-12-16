@@ -74,10 +74,6 @@ tasks:
     deps:
       - task: "init"
     cmds:
-      - task: "solo:node:stop"
-      - task: "solo:network:destroy"
-      - task: "solo:destroy-mirror-node"
-      - task: "solo:destroy-relay"
       - task: "cluster:destroy"
 
   clean:
